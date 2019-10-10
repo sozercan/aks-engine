@@ -265,6 +265,82 @@ func TestAgentPoolProfileIsVHDDistro(t *testing.T) {
 	}
 }
 
+func TestAgentPoolProfileIsAuditDEnabled(t *testing.T) {
+	cases := []struct {
+		name     string
+		ap       AgentPoolProfile
+		expected bool
+	}{
+		{
+			name:     "default",
+			ap:       AgentPoolProfile{},
+			expected: false,
+		},
+		{
+			name: "true",
+			ap: AgentPoolProfile{
+				AuditDEnabled: to.BoolPtr(true),
+			},
+			expected: true,
+		},
+		{
+			name: "false",
+			ap: AgentPoolProfile{
+				AuditDEnabled: to.BoolPtr(false),
+			},
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if c.expected != c.ap.IsAuditDEnabled() {
+				t.Fatalf("Got unexpected AgentPoolProfile.IsAuditDEnabled() result. Expected: %t. Got: %t.", c.expected, c.ap.IsAuditDEnabled())
+			}
+		})
+	}
+}
+
+func TestMasterProfileIsAuditDEnabled(t *testing.T) {
+	cases := []struct {
+		name     string
+		mp       MasterProfile
+		expected bool
+	}{
+		{
+			name:     "default",
+			mp:       MasterProfile{},
+			expected: false,
+		},
+		{
+			name: "true",
+			mp: MasterProfile{
+				AuditDEnabled: to.BoolPtr(true),
+			},
+			expected: true,
+		},
+		{
+			name: "false",
+			mp: MasterProfile{
+				AuditDEnabled: to.BoolPtr(false),
+			},
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if c.expected != c.mp.IsAuditDEnabled() {
+				t.Fatalf("Got unexpected AgentPoolProfile.IsAuditDEnabled() result. Expected: %t. Got: %t.", c.expected, c.mp.IsAuditDEnabled())
+			}
+		})
+	}
+}
+
 func TestAgentPoolProfileIsUbuntuNonVHD(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -6325,5 +6401,149 @@ func TestHasContainerd(t *testing.T) {
 				t.Errorf("expected %t, instead got : %t", test.expected, ret)
 			}
 		})
+	}
+}
+
+func TestGetNonMasqueradeCIDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		p        *Properties
+		expected string
+	}{
+		{
+			name: "single cluster cidr, no dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "10.244.0.0/16",
+					},
+				},
+				FeatureFlags: &FeatureFlags{},
+			},
+			expected: "10.244.0.0/16",
+		},
+		{
+			name: "two cluster cidr v4v6, dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "10.244.0.0/16,fd00:101::/8",
+					},
+				},
+				FeatureFlags: &FeatureFlags{
+					EnableIPv6DualStack: true,
+				},
+			},
+			expected: "10.244.0.0/16",
+		},
+		{
+			name: "two cluster cidr v6v4, dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "fd00:101::/8,10.244.0.0/16",
+					},
+				},
+				FeatureFlags: &FeatureFlags{
+					EnableIPv6DualStack: true,
+				},
+			},
+			expected: "fd00::/8",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ret := test.p.GetNonMasqueradeCIDR()
+			if test.expected != ret {
+				t.Errorf("expected %s, instead got : %s", test.expected, ret)
+			}
+		})
+	}
+}
+
+func TestGetSecondaryNonMasqueradeCIDR(t *testing.T) {
+	tests := []struct {
+		name     string
+		p        *Properties
+		expected string
+	}{
+		{
+			name: "single cluster cidr, no dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "10.244.0.0/16",
+					},
+				},
+				FeatureFlags: &FeatureFlags{},
+			},
+			expected: "",
+		},
+		{
+			name: "two cluster cidr v4v6, dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "10.244.0.0/16,fd00:101::/8",
+					},
+				},
+				FeatureFlags: &FeatureFlags{
+					EnableIPv6DualStack: true,
+				},
+			},
+			expected: "fd00::/8",
+		},
+		{
+			name: "two cluster cidr v6v4, dualstack",
+			p: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					KubernetesConfig: &KubernetesConfig{
+						ClusterSubnet: "fd00:101::/8,10.244.0.0/16",
+					},
+				},
+				FeatureFlags: &FeatureFlags{
+					EnableIPv6DualStack: true,
+				},
+			},
+			expected: "10.244.0.0/16",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ret := test.p.GetSecondaryNonMasqueradeCIDR()
+			if test.expected != ret {
+				t.Errorf("expected %s, instead got : %s", test.expected, ret)
+			}
+		})
+	}
+}
+
+func TestPropertiesHasDCSeriesSKU(t *testing.T) {
+	cases := common.GetDCSeriesVMCasesForTesting()
+
+	for _, c := range cases {
+		p := Properties{
+			AgentPoolProfiles: []*AgentPoolProfile{
+				{
+					Name:   "agentpool",
+					VMSize: c.VMSKU,
+					Count:  1,
+				},
+			},
+			OrchestratorProfile: &OrchestratorProfile{
+				OrchestratorType:    Kubernetes,
+				OrchestratorVersion: "1.16.0",
+			},
+		}
+		ret := p.HasDCSeriesSKU()
+		if ret != c.Expected {
+			t.Fatalf("expected HasDCSeriesSKU(%s) to return %t, but instead got %t", c.VMSKU, c.Expected, ret)
+		}
 	}
 }

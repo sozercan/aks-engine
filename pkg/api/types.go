@@ -1196,13 +1196,26 @@ func (p *Properties) GetNonMasqueradeCIDR() string {
 				nonMasqCidr = DefaultVNETCIDR
 			}
 		} else {
-			// kube-proxy still only understands single cidr and is not changed for ipv6 dual stack phase 1
-			// so only pass the ipv4 cidr which is the first one in the list as arg to kube proxy
 			if p.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
-				nonMasqCidr = strings.Split(p.OrchestratorProfile.KubernetesConfig.ClusterSubnet, ",")[0]
+				cidr := strings.Split(p.OrchestratorProfile.KubernetesConfig.ClusterSubnet, ",")[0]
+				_, ipnet, _ := net.ParseCIDR(cidr)
+				nonMasqCidr = ipnet.String()
 			} else {
 				nonMasqCidr = p.OrchestratorProfile.KubernetesConfig.ClusterSubnet
 			}
+		}
+	}
+	return nonMasqCidr
+}
+
+// GetSecondaryNonMasqueradeCIDR returns second cidr in case of dualstack clusters
+func (p *Properties) GetSecondaryNonMasqueradeCIDR() string {
+	var nonMasqCidr string
+	if !p.IsHostedMasterProfile() {
+		if p.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
+			cidr := strings.Split(p.OrchestratorProfile.KubernetesConfig.ClusterSubnet, ",")[1]
+			_, ipnet, _ := net.ParseCIDR(cidr)
+			nonMasqCidr = ipnet.String()
 		}
 	}
 	return nonMasqCidr
@@ -1284,6 +1297,11 @@ func (m *MasterProfile) IsCoreOS() bool {
 // IsVHDDistro returns true if the distro uses VHD SKUs
 func (m *MasterProfile) IsVHDDistro() bool {
 	return m.Distro == AKSUbuntu1604 || m.Distro == AKSUbuntu1804
+}
+
+// IsAuditDEnabled returns true if the master profile is configured for auditd
+func (m *MasterProfile) IsAuditDEnabled() bool {
+	return to.Bool(m.AuditDEnabled)
 }
 
 // IsVirtualMachineScaleSets returns true if the master availability profile is VMSS
@@ -1413,6 +1431,11 @@ func (a *AgentPoolProfile) IsCoreOS() bool {
 // IsVHDDistro returns true if the distro uses VHD SKUs
 func (a *AgentPoolProfile) IsVHDDistro() bool {
 	return a.Distro == AKSUbuntu1604 || a.Distro == AKSUbuntu1804
+}
+
+// IsAuditDEnabled returns true if the master profile is configured for auditd
+func (a *AgentPoolProfile) IsAuditDEnabled() bool {
+	return to.Bool(a.AuditDEnabled)
 }
 
 // IsAvailabilitySets returns true if the customer specified disks
@@ -1789,6 +1812,16 @@ func (a *AgentPoolProfile) IsNSeriesSKU() bool {
 func (p *Properties) HasNSeriesSKU() bool {
 	for _, profile := range p.AgentPoolProfiles {
 		if strings.Contains(profile.VMSize, "Standard_N") {
+			return true
+		}
+	}
+	return false
+}
+
+// HasDCSeriesSKU returns whether or not there is an DC series SKU agent pool
+func (p *Properties) HasDCSeriesSKU() bool {
+	for _, profile := range p.AgentPoolProfiles {
+		if strings.Contains(profile.VMSize, "Standard_DC") {
 			return true
 		}
 	}
