@@ -455,11 +455,11 @@ const (
 	// DefaultKubernetesMaxPodsAzureCNI is the maximum number of pods to run on a node for Azure CNI.
 	DefaultKubernetesMaxPodsAzureCNI = "30"
 	// DefaultKubernetesAPIServerEnableProfiling is the config that enables profiling via web interface host:port/debug/pprof/
-	DefaultKubernetesAPIServerEnableProfiling = "false"
+	DefaultKubernetesAPIServerEnableProfiling = "true"
 	// DefaultKubernetesCtrMgrEnableProfiling is the config that enables profiling via web interface host:port/debug/pprof/
-	DefaultKubernetesCtrMgrEnableProfiling = "false"
+	DefaultKubernetesCtrMgrEnableProfiling = "true"
 	// DefaultKubernetesSchedulerEnableProfiling is the config that enables profiling via web interface host:port/debug/pprof/
-	DefaultKubernetesSchedulerEnableProfiling = "false"
+	DefaultKubernetesSchedulerEnableProfiling = "true"
 	// DefaultNonMasqueradeCIDR is the default --non-masquerade-cidr value for kubelet
 	DefaultNonMasqueradeCIDR = "0.0.0.0/0"
 	// DefaultKubeProxyMode is the default KubeProxyMode value
