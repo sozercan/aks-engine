@@ -1,17 +1,12 @@
 import groovy.json.*
 
 defaultEnv = [
-	FORK: "${params.FORK}",
-	BRANCH: "${params.BRANCH}",
-	REGION_OPTIONS: "${params.REGIONS}",
-	UPGRADE_CLUSTER: params.UPGRADE_CLUSTER,
-	SCALE_CLUSTER: params.SCALE_CLUSTER,
-	NODE_COUNT: params.NODE_COUNT,
 	CLEANUP_ON_EXIT: true,
 	CREATE_VNET: false,
-	]
+	] + params
 
 def k8sVersions = ["1.12", "1.13", "1.14", "1.15", "1.16"]
+def latestReleasedVersion = "1.16"
 def tasks = [:]
 def testConfigs = []
 
@@ -34,7 +29,7 @@ def tasksForUpgradeJob(jobCfg, aksEngineVersions, jobName, version) {
 	}
 
 	def upgradeVersion = latestVersion.upgrades.last().orchestratorVersion
-	jobCfg["UPGRADE_VERSIONS"] = upgradeVersion
+	jobCfg.env["UPGRADE_VERSIONS"] = upgradeVersion
 
 	jobName = "${jobName}/upgrade/${upgradeVersion}"
 	t[jobName] = runJobWithEnvironment(jobCfg, jobName, version)
@@ -48,6 +43,8 @@ def taskForCreateJob(jobCfg, jobName, version) {
 }
 
 def runJobWithEnvironment(jobCfg, jobName, version) {
+	def jobSpecificEnv = defaultEnv + jobCfg.env
+	def opts = jobCfg.options
 	return {
 		node {
 			ws("${env.JOB_NAME}-${jobName}") {
@@ -62,7 +59,6 @@ def runJobWithEnvironment(jobCfg, jobName, version) {
 						unstash(name: 'aks-engine-bin')
 					}
 
-					def jobSpecificEnv = (jobCfg.env == null) ? defaultEnv.clone() : defaultEnv + jobCfg.env
 					// set environment variables needed for the test script
 					def envVars = [
 							ORCHESTRATOR_RELEASE: "${version}",
@@ -70,10 +66,12 @@ def runJobWithEnvironment(jobCfg, jobName, version) {
 						] + jobSpecificEnv
 					withEnv(envVars.collect{ k, v -> "${k}=${v}" }) {
 						// define any sensitive data needed for the test script
+						def clientIdOverride = opts?.clientId ? opts.clientId : 'AKS_ENGINE_3014546b_CLIENT_ID'
+						def clientSecretOverride = opts?.clientSecret ? opts.clientSecret : 'AKS_ENGINE_3014546b_CLIENT_SECRET'
 						def creds = [
 								string(credentialsId: 'AKS_ENGINE_TENANT_ID', variable: 'TENANT_ID'),
-								string(credentialsId: 'AKS_ENGINE_3014546b_CLIENT_ID', variable: 'CLIENT_ID'),
-								string(credentialsId: 'AKS_ENGINE_3014546b_CLIENT_SECRET', variable: 'CLIENT_SECRET'),
+								string(credentialsId: clientIdOverride, variable: 'CLIENT_ID'),
+								string(credentialsId: clientSecretOverride, variable: 'CLIENT_SECRET'),
 								string(credentialsId: 'LOG_ANALYTICS_WORKSPACE_KEY', variable: 'LOG_ANALYTICS_WORKSPACE_KEY')
 							]
 
@@ -135,6 +133,10 @@ stage ("discover tests") {
 		testConfigs = findFiles(glob: '**/test/e2e/test_cluster_configs/**/*.json')
 		testConfigs.each { cfgFile ->
 			def jobCfg = readJSON(file: cfgFile.path)
+			if(!jobCfg.env) {
+				jobCfg.env = [:] // ensure env exists
+			}
+
 			k8sVersions.each { version ->
 				def jobName = cfgFile.path[cfgFile.path.indexOf("test_cluster_configs/") + 21..-6] // remove leader and trailing .json
 				jobName = "v${version}/${jobName}"
@@ -150,11 +152,20 @@ stage ("discover tests") {
 					return // this is a continue and will not exit the entire iteration
 				}
 
-				def isAllowedVersion = jobCfg.options?.allowedOrchestratorVersions == null ? true : version in jobCfg.options.allowedOrchestratorVersions
-				if(!isAllowedVersion) {
+				// run the job if:
+				// allowedOrchestratorVersions is not set OR
+				// allowedOrchestratorVersions contains version being processed OR
+				// (version being process equals latestReleasedVersion AND allowedOrchestratorVersions contains "latestReleasedVersion")
+				def allowedVersions = jobCfg.options?.allowedOrchestratorVersions
+				def isVersionAllowed = allowedVersions == null ? true  : version in allowedVersions
+				isVersionAllowed |= version == latestReleasedVersion && allowedVersions && "latestReleasedVersion" in allowedVersions
+
+				if(!isVersionAllowed) {
 					// the job config has limited this job to not run for this verion of the orchestrator
-					echo("${jobName} is limited to ${jobCfg.options?.allowedOrchestratorVersions}; not running ${version}")
+					echo("${jobName} is limited to ${jobCfg.options?.allowedOrchestratorVersions}; not running for ${version}")
 					return // this is a continue and will not exit the entire iteration
+				} else {
+					echo("${jobName} is limted to '${jobCfg.options?.allowedOrchestratorVersions}'; running for ${version}")
 				}
 
 				if(params.UPGRADE_CLUSTER) {

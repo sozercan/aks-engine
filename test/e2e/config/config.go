@@ -42,6 +42,7 @@ type Config struct {
 	UseDeployCommand    bool   `envconfig:"USE_DEPLOY_COMMAND"`
 	GinkgoFocus         string `envconfig:"GINKGO_FOCUS"`
 	GinkgoSkip          string `envconfig:"GINKGO_SKIP"`
+	DebugAfterSuite     bool   `envconfig:"DEBUG_AFTERSUITE" default:"false"`
 }
 
 // CustomCloudConfig holds configurations for custom clould
@@ -296,7 +297,7 @@ func (c *Config) IsKubernetes() bool {
 func (c *Config) SetRandomRegion() {
 	var regions []string
 	if c.Regions == nil || len(c.Regions) == 0 {
-		regions = []string{"eastus", "southcentralus", "southeastasia", "westus2", "westeurope"}
+		regions = []string{"eastus", "uksouth", "southeastasia", "westus2", "westeurope"}
 	} else {
 		regions = c.Regions
 	}

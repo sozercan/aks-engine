@@ -143,6 +143,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		cloudInitFiles["dockerMonitorSystemdTimer"] = getBase64EncodedGzippedCustomScript(kubernetesDockerMonitorSystemdTimer)
 		cloudInitFiles["kubeletSystemdService"] = getBase64EncodedGzippedCustomScript(kubeletSystemdService)
 		cloudInitFiles["dockerClearMountPropagationFlags"] = getBase64EncodedGzippedCustomScript(dockerClearMountPropagationFlags)
+		cloudInitFiles["auditdRules"] = getBase64EncodedGzippedCustomScript(auditdRules)
 	}
 
 	masterVars["cloudInitFiles"] = cloudInitFiles
@@ -260,7 +261,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		masterVars["etcdServerCertFilepath"] = "/etc/kubernetes/certs/etcdserver.crt"
 		masterVars["etcdServerKeyFilepath"] = "/etc/kubernetes/certs/etcdserver.key"
 	}
-	if useManagedIdentity {
+	if useManagedIdentity && !isHostedMaster {
 		masterVars["servicePrincipalClientId"] = "msi"
 		masterVars["servicePrincipalClientSecret"] = "msi"
 	} else {
