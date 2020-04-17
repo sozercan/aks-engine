@@ -17,7 +17,6 @@ func (cs *ContainerService) setCloudControllerManagerConfig() {
 		"--cloud-provider":              "azure",
 		"--cloud-config":                "/etc/kubernetes/azure.json",
 		"--cluster-cidr":                o.KubernetesConfig.ClusterSubnet,
-		"--kubeconfig":                  "/var/lib/kubelet/kubeconfig",
 		"--leader-elect":                "true",
 		"--route-reconciliation-period": "10s",
 		"--v":                           "2",
@@ -59,9 +58,4 @@ func (cs *ContainerService) setCloudControllerManagerConfig() {
 	for key, val := range staticCloudControllerManagerConfig {
 		o.KubernetesConfig.CloudControllerManagerConfig[key] = val
 	}
-
-	// TODO add RBAC support
-	/*if *o.KubernetesConfig.EnableRbac {
-		o.KubernetesConfig.CloudControllerManagerConfig["--use-service-account-credentials"] = "true"
-	}*/
 }
