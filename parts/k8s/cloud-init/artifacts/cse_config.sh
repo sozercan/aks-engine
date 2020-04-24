@@ -5,6 +5,7 @@ PRIVATE_IP=$(hostname -I | cut -d' ' -f1)
 ETCD_PEER_URL="https://${PRIVATE_IP}:2380"
 ETCD_CLIENT_URL="https://${PRIVATE_IP}:2379"
 KUBECTL="/usr/local/bin/kubectl --kubeconfig=/home/$ADMINUSER/.kube/config"
+MOUNT_ETCD_SCRIPT=/opt/azure/containers/mountetcd.sh
 
 systemctlEnableAndStart() {
   systemctl_restart 100 5 30 $1
@@ -14,6 +15,21 @@ systemctlEnableAndStart() {
     return 1
   fi
   if ! retrycmd 120 5 25 systemctl enable $1; then
+    return 1
+  fi
+}
+systemctlEtcd() {
+  for i in $(seq 1 60); do
+    timeout 30 systemctl daemon-reload
+    timeout 30 systemctl restart etcd && break ||
+      if [ $i -eq 60 ]; then
+        return 1
+      else
+        $MOUNT_ETCD_SCRIPT
+        sleep 5
+      fi
+  done
+  if ! retrycmd 120 5 25 systemctl enable etcd; then
     return 1
   fi
 }
@@ -84,10 +100,9 @@ configureEtcd() {
     done
   fi
 
-  MOUNT_ETCD_FILE=/opt/azure/containers/mountetcd.sh
-  wait_for_file 1200 1 $MOUNT_ETCD_FILE || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
-  $MOUNT_ETCD_FILE || exit {{GetCSEErrorCode "ERR_ETCD_VOL_MOUNT_FAIL"}}
-  systemctlEnableAndStart etcd || exit {{GetCSEErrorCode "ERR_ETCD_START_TIMEOUT"}}
+  wait_for_file 1200 1 $MOUNT_ETCD_SCRIPT || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
+  $MOUNT_ETCD_SCRIPT || exit {{GetCSEErrorCode "ERR_ETCD_VOL_MOUNT_FAIL"}}
+  systemctlEtcd || exit {{GetCSEErrorCode "ERR_ETCD_START_TIMEOUT"}}
   for i in $(seq 1 600); do
     MEMBER="$(sudo -E etcdctl member list | grep -E ${NODE_NAME} | cut -d':' -f 1)"
     if [ "$MEMBER" != "" ]; then
@@ -231,7 +246,7 @@ configureCNI() {
   {{/* needed for the iptables rules to work on bridges */}}
   retrycmd 120 5 25 modprobe br_netfilter || exit {{GetCSEErrorCode "ERR_MODPROBE_FAIL"}}
   echo -n "br_netfilter" >/etc/modules-load.d/br_netfilter.conf
-  configureCNIIPTables
+  configureAzureCNI
   {{if HasCiliumNetworkPlugin}}
   systemctl enable sys-fs-bpf.mount
   systemctl restart sys-fs-bpf.mount
@@ -245,13 +260,22 @@ configureCNI() {
   fi
 {{end}}
 }
-configureCNIIPTables() {
-  if [[ ${NETWORK_PLUGIN} == "azure" ]]; then
+configureAzureCNI() {
+  if [[ "${NETWORK_PLUGIN}" == "azure" ]]; then
     mv $CNI_BIN_DIR/10-azure.conflist $CNI_CONFIG_DIR/
     chmod 600 $CNI_CONFIG_DIR/10-azure.conflist
-    if [[ ${NETWORK_POLICY} == "calico" ]]; then
+    if [[ "${IS_IPV6_DUALSTACK_FEATURE_ENABLED}" == "true" ]]; then
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipv6Mode="ipv6nat"') > "$CNI_CONFIG_DIR/10-azure.conflist"
+    fi
+    if [[ {{GetKubeProxyMode}} == "ipvs" ]]; then
+      serviceCidrs={{GetServiceCidr}}
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq  --arg serviceCidrs $serviceCidrs '.plugins[0]+={serviceCidrs: $serviceCidrs}') > /etc/cni/net.d/10-azure.conflist
+    fi
+    if [[ "${NETWORK_POLICY}" == "calico" ]]; then
       sed -i 's#"mode":"bridge"#"mode":"transparent"#g' $CNI_CONFIG_DIR/10-azure.conflist
-    elif [[ ${NETWORK_POLICY} == "" || ${NETWORK_POLICY} == "none" ]] && [[ ${NETWORK_MODE} == "transparent" ]]; then
+    elif [[ "${NETWORK_POLICY}" == "antrea" ]]; then
+      sed -i 's#"mode":"bridge"#"mode":"transparent"#g' $CNI_CONFIG_DIR/10-azure.conflist
+    elif [[ "${NETWORK_POLICY}" == "" || "${NETWORK_POLICY}" == "none" ]] && [[ "${NETWORK_MODE}" == "transparent" ]]; then
       sed -i 's#"mode":"bridge"#"mode":"transparent"#g' $CNI_CONFIG_DIR/10-azure.conflist
     fi
     /sbin/ebtables -t nat --list
@@ -271,8 +295,8 @@ installContainerd() {
       exit 25
     fi
     removeContainerd
-    echo "deb [arch=amd64,arm64,armhf] https://packages.microsoft.com/${url_path} testing main" >/tmp/microsoft-prod-testing.list
-    retrycmd 10 5 10 cp /tmp/microsoft-prod-testing.list /etc/apt/sources.list.d/ || exit 25
+    retrycmd_no_stats 120 5 25 curl https://packages.microsoft.com/config/ubuntu/${UBUNTU_RELEASE}/prod.list >/tmp/microsoft-prod.list || exit 25
+    retrycmd 10 5 10 cp /tmp/microsoft-prod.list /etc/apt/sources.list.d/ || exit 25
     retrycmd_no_stats 120 5 25 curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor >/tmp/microsoft.gpg || exit 26
     retrycmd 10 5 10 cp /tmp/microsoft.gpg /etc/apt/trusted.gpg.d/ || exit 26
     apt_get_update || exit 99
@@ -340,9 +364,15 @@ ensureKubelet() {
   done
   {{end}}
   {{if HasAntreaNetworkPolicy}}
-  while [ ! -f /etc/cni/net.d/10-antrea.conf ]; do
-    sleep 3
-  done
+  if [[ "${NETWORK_PLUGIN}" = "azure" ]]; then
+    while ! $(grep -sq "antrea" $CNI_CONFIG_DIR/10-azure.conflist); do
+      sleep 3
+    done
+  else
+    while [ ! -f $CNI_CONFIG_DIR/10-antrea.conf ]; do
+      sleep 3
+    done
+  fi
   {{end}}
   {{if HasFlannelNetworkPlugin}}
   while [ ! -f /etc/cni/net.d/10-flannel.conf ]; do

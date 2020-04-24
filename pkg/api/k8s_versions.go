@@ -19,7 +19,7 @@ const (
 	calicoCNIImageReference                           string = "cni:v3.8.0"
 	calicoNodeImageReference                          string = "node:v3.8.0"
 	calicoPod2DaemonImageReference                    string = "pod2daemon-flexvol:v3.8.0"
-	calicoClusterProportionalAutoscalerImageReference string = "cluster-proportional-autoscaler-amd64:1.1.2-r2"
+	calicoClusterProportionalAutoscalerImageReference string = "mcr.microsoft.com/oss/kubernetes/autoscaler/cluster-proportional-autoscaler:1.1.2-r2"
 	ciliumAgentImageReference                         string = "docker.io/cilium/cilium:v1.4"
 	ciliumCleanStateImageReference                    string = "docker.io/cilium/cilium-init:2018-10-16"
 	ciliumOperatorImageReference                      string = "docker.io/cilium/operator:v1.4"
@@ -34,15 +34,17 @@ const (
 	azurePolicyImageReference                         string = "mcr.microsoft.com/azure-policy/policy-kubernetes-addon-prod:prod_20200227.1"
 	gatekeeperImageReference                          string = "mcr.microsoft.com/oss/open-policy-agent/gatekeeper:v3.1.0-beta.7-hotfix.20200327"
 	nodeProblemDetectorImageReference                 string = "k8s.gcr.io/node-problem-detector:v0.8.1"
-	csiProvisionerImageReference                      string = "oss/kubernetes-csi/csi-provisioner:v1.4.0"
+	csiProvisionerImageReference                      string = "oss/kubernetes-csi/csi-provisioner:v1.5.0"
 	csiAttacherImageReference                         string = "oss/kubernetes-csi/csi-attacher:v1.2.0"
-	csiClusterDriverRegistrarImageReference           string = "oss/kubernetes-csi/csi-cluster-driver-registrar:v1.0.1"
 	csiLivenessProbeImageReference                    string = "oss/kubernetes-csi/livenessprobe:v1.1.0"
-	csiNodeDriverRegistrarImageReference              string = "oss/kubernetes-csi/csi-node-driver-registrar:v1.1.0"
-	csiSnapshotterImageReference                      string = "oss/kubernetes-csi/csi-snapshotter:v1.1.0"
+	csiLivenessProbeWindowsImageReference             string = "oss/kubernetes-csi/livenessprobe:v2.0.1-alpha.1-windows-1809-amd64"
+	csiNodeDriverRegistrarImageReference              string = "oss/kubernetes-csi/csi-node-driver-registrar:v1.2.0"
+	csiNodeDriverRegistrarWindowsImageReference       string = "oss/kubernetes-csi/csi-node-driver-registrar:v1.2.1-alpha.1-windows-1809-amd64"
 	csiResizerImageReference                          string = "oss/kubernetes-csi/csi-resizer:v0.3.0"
-	csiAzureDiskImageReference                        string = "k8s/csi/azuredisk-csi:v0.5.0"
-	csiAzureFileImageReference                        string = "k8s/csi/azurefile-csi:v0.3.0"
+	csiSnapshotterImageReference                      string = "oss/kubernetes-csi/csi-snapshotter:v2.0.0"
+	csiSnapshotControllerImageReference               string = "oss/kubernetes-csi/snapshot-controller:v2.0.0"
+	csiAzureDiskImageReference                        string = "k8s/csi/azuredisk-csi:v0.7.0"
+	csiAzureFileImageReference                        string = "k8s/csi/azurefile-csi:v0.6.0"
 	azureCloudControllerManagerImageReference         string = "oss/kubernetes/azure-cloud-controller-manager:v0.5.0"
 	azureCloudNodeManagerImageReference               string = "oss/kubernetes/azure-cloud-node-manager:v0.5.0"
 	kubeFlannelImageReference                         string = "quay.io/coreos/flannel:v0.8.0-amd64"
@@ -90,6 +92,13 @@ var kubernetesImageBaseDefaultImages = map[string]map[string]string{
 		common.APIServerComponentName:         "oss/kubernetes/kube-apiserver",
 		common.SchedulerComponentName:         "oss/kubernetes/kube-scheduler",
 		common.Hyperkube:                      "oss/kubernetes/hyperkube",
+	},
+}
+
+var csiSidecarComponentsOverrides = map[string]map[string]string{
+	common.AzureFileCSIDriverAddonName: {
+		common.CSIProvisionerContainerName: "oss/kubernetes-csi/csi-provisioner:v1.4.0",
+		common.CSISnapshotterContainerName: "oss/kubernetes-csi/csi-snapshotter:v1.1.0",
 	},
 }
 
@@ -215,7 +224,7 @@ var kubernetesImageBaseVersionedImages = map[string]map[string]map[string]string
 			common.AddonResizerComponentName:  "oss/kubernetes/autoscaler/addon-resizer:1.8.7",
 			common.MetricsServerAddonName:     "oss/kubernetes/metrics-server:v0.3.5",
 			common.AddonManagerComponentName:  "oss/kubernetes/kube-addon-manager:v9.0.2",
-			common.ClusterAutoscalerAddonName: "oss/kubernetes/autoscaler/cluster-autoscaler:v1.18.0",
+			common.ClusterAutoscalerAddonName: "oss/kubernetes/autoscaler/cluster-autoscaler:v1.18.1",
 		},
 		"1.18": {
 			common.AddonResizerComponentName:  "oss/kubernetes/autoscaler/addon-resizer:1.8.7",
@@ -444,10 +453,12 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
+			common.CSILivenessProbeWindowsContainerName:       csiLivenessProbeWindowsImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
+			common.CSINodeDriverRegistrarWindowsContainerName: csiNodeDriverRegistrarWindowsImageReference,
 			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
+			common.CSISnapshotControllerContainerName:         csiSnapshotControllerImageReference,
 			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
@@ -524,10 +535,12 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
+			common.CSILivenessProbeWindowsContainerName:       csiLivenessProbeWindowsImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
+			common.CSINodeDriverRegistrarWindowsContainerName: csiNodeDriverRegistrarWindowsImageReference,
 			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
+			common.CSISnapshotControllerContainerName:         csiSnapshotControllerImageReference,
 			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
@@ -604,10 +617,10 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
 			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
+			common.CSISnapshotControllerContainerName:         csiSnapshotControllerImageReference,
 			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
@@ -682,10 +695,8 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
-			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
 			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
@@ -759,11 +770,8 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
-			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
-			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
 			common.KubeFlannelContainerName:                   kubeFlannelImageReference,
@@ -834,11 +842,8 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
-			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
-			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
 			common.KubeFlannelContainerName:                   kubeFlannelImageReference,
@@ -909,11 +914,8 @@ func getK8sVersionComponents(version, kubernetesImageBaseType string, overrides 
 			common.NodeProblemDetectorAddonName:               nodeProblemDetectorImageReference,
 			common.CSIProvisionerContainerName:                csiProvisionerImageReference,
 			common.CSIAttacherContainerName:                   csiAttacherImageReference,
-			common.CSIClusterDriverRegistrarContainerName:     csiClusterDriverRegistrarImageReference,
 			common.CSILivenessProbeContainerName:              csiLivenessProbeImageReference,
 			common.CSINodeDriverRegistrarContainerName:        csiNodeDriverRegistrarImageReference,
-			common.CSISnapshotterContainerName:                csiSnapshotterImageReference,
-			common.CSIResizerContainerName:                    csiResizerImageReference,
 			common.CSIAzureDiskContainerName:                  csiAzureDiskImageReference,
 			common.CSIAzureFileContainerName:                  csiAzureFileImageReference,
 			common.KubeFlannelContainerName:                   kubeFlannelImageReference,

@@ -67,6 +67,7 @@ func (cs *ContainerService) SetPropertiesDefaults(params PropertiesDefaultsParam
 
 	if cs.Properties.WindowsProfile != nil {
 		properties.setWindowsProfileDefaults(params.IsUpgrade, params.IsScale)
+		cs.setCSIProxyDefaults()
 	}
 
 	properties.setTelemetryProfileDefaults()
@@ -120,7 +121,9 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 		case NetworkPolicyCilium:
 			o.KubernetesConfig.NetworkPlugin = NetworkPluginCilium
 		case NetworkPolicyAntrea:
-			o.KubernetesConfig.NetworkPlugin = NetworkPluginAntrea
+			if o.KubernetesConfig.NetworkPlugin == "" {
+				o.KubernetesConfig.NetworkPlugin = NetworkPluginAzure
+			}
 		}
 
 		if a.IsAzureStackCloud() {
@@ -217,6 +220,9 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 				// When Azure CNI is enabled, all masters, agents and pods share the same large subnet.
 				// Except when master is VMSS, then masters and agents have separate subnets within the same large subnet.
 				o.KubernetesConfig.ClusterSubnet = DefaultKubernetesSubnet
+				if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
+					o.KubernetesConfig.ClusterSubnet = strings.Join([]string{DefaultKubernetesSubnet, cs.getDefaultKubernetesClusterSubnetIPv6()}, ",")
+				}
 			} else {
 				o.KubernetesConfig.ClusterSubnet = DefaultKubernetesClusterSubnet
 				// ipv6 only cluster
@@ -230,7 +236,7 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 			}
 		} else {
 			// ensure 2 subnets exists if ipv6 dual stack feature is enabled
-			if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") && !o.IsAzureCNI() {
+			if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") {
 				clusterSubnets := strings.Split(o.KubernetesConfig.ClusterSubnet, ",")
 				if len(clusterSubnets) == 1 {
 					// if error exists, then it'll be caught by validate
@@ -241,11 +247,15 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 							clusterSubnets = append(clusterSubnets, cs.getDefaultKubernetesClusterSubnetIPv6())
 						} else {
 							// first cidr has to be ipv4
-							clusterSubnets = append([]string{DefaultKubernetesClusterSubnet}, clusterSubnets...)
+							if o.IsAzureCNI() {
+								clusterSubnets = append([]string{DefaultKubernetesSubnet}, clusterSubnets...)
+							} else {
+								clusterSubnets = append([]string{DefaultKubernetesClusterSubnet}, clusterSubnets...)
+							}
 						}
 						// only set the cluster subnet if no error has been encountered
-						o.KubernetesConfig.ClusterSubnet = strings.Join(clusterSubnets, ",")
 					}
+					o.KubernetesConfig.ClusterSubnet = strings.Join(clusterSubnets, ",")
 				}
 			}
 		}
@@ -419,12 +429,21 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 			o.KubernetesConfig.CloudProviderDisableOutboundSNAT = to.BoolPtr(false)
 		}
 
+		if o.KubernetesConfig.ContainerRuntimeConfig == nil {
+			o.KubernetesConfig.ContainerRuntimeConfig = make(map[string]string)
+		}
+
 		// Master-specific defaults that depend upon OrchestratorProfile defaults
 		if cs.Properties.MasterProfile != nil {
 			if !cs.Properties.MasterProfile.IsCustomVNET() {
 				if cs.Properties.OrchestratorProfile.IsAzureCNI() {
 					// When VNET integration is enabled, all masters, agents and pods share the same large subnet.
-					cs.Properties.MasterProfile.Subnet = cs.Properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet
+					cs.Properties.MasterProfile.Subnet = o.KubernetesConfig.ClusterSubnet
+					clusterSubnets := strings.Split(o.KubernetesConfig.ClusterSubnet, ",")
+					if cs.Properties.IsAzureCNIDualStack() && len(clusterSubnets) > 1 {
+						cs.Properties.MasterProfile.Subnet = clusterSubnets[0]
+					}
+					cs.Properties.MasterProfile.SubnetIPv6 = DefaultKubernetesMasterSubnetIPv6
 					// FirstConsecutiveStaticIP is not reset if it is upgrade and some value already exists
 					if !isUpgrade || len(cs.Properties.MasterProfile.FirstConsecutiveStaticIP) == 0 {
 						if cs.Properties.MasterProfile.IsVirtualMachineScaleSets() {
@@ -749,6 +768,10 @@ func (p *Properties) setAgentProfileDefaults(isUpgrade, isScale bool) {
 func (p *Properties) setWindowsProfileDefaults(isUpgrade, isScale bool) {
 	windowsProfile := p.WindowsProfile
 	if !isUpgrade && !isScale {
+		if windowsProfile.SSHEnabled == nil {
+			windowsProfile.SSHEnabled = to.BoolPtr(DefaultWindowsSSHEnabled)
+		}
+
 		// This allows caller to use the latest ImageVersion and WindowsSku for adding a new Windows pool to an existing cluster.
 		// We must assure that same WindowsPublisher and WindowsOffer are used in an existing cluster.
 		if windowsProfile.WindowsPublisher == AKSWindowsServer2019OSImageConfig.ImagePublisher && windowsProfile.WindowsOffer == AKSWindowsServer2019OSImageConfig.ImageOffer {
@@ -1096,4 +1119,27 @@ func (cs *ContainerService) getDefaultKubernetesClusterSubnetIPv6() string {
 	// In 1.16, the default mask size for IPv6 is /24 which forces the cluster
 	// subnet mask size to be strictly >= /8
 	return "fc00::/8"
+}
+
+func (cs *ContainerService) setCSIProxyDefaults() {
+	p := cs.Properties
+	useCloudControllerManager := p.OrchestratorProfile.KubernetesConfig != nil && to.Bool(p.OrchestratorProfile.KubernetesConfig.UseCloudControllerManager)
+	k8sVersion := p.OrchestratorProfile.OrchestratorVersion
+	w := p.WindowsProfile
+	// We should enable CSI proxy if:
+	// 1. enableCSIProxy is not defined and cloud-controller-manager
+	//    is being used on a Windows cluster with K8s >= 1.18.0 or
+	// 2. enabledCSIProxy is true
+	// 3. csiProxyURL is defined
+	shouldEnableCSIProxy := (w.EnableCSIProxy == nil && useCloudControllerManager && common.IsKubernetesVersionGe(k8sVersion, "1.18.0")) ||
+		w.IsCSIProxyEnabled() ||
+		w.CSIProxyURL != ""
+
+	if shouldEnableCSIProxy {
+		w.EnableCSIProxy = to.BoolPtr(true)
+		if w.CSIProxyURL == "" {
+			cloudSpecConfig := cs.GetCloudSpecConfig()
+			w.CSIProxyURL = cloudSpecConfig.KubernetesSpecConfig.CSIProxyDownloadURL
+		}
+	}
 }

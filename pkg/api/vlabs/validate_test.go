@@ -173,6 +173,32 @@ func Test_OrchestratorProfile_Validate(t *testing.T) {
 			},
 			expectedError: "loadBalancerSku is only available in Kubernetes version 1.11.0 or greater; unable to validate for Kubernetes version 1.6.9",
 		},
+		"should error when KubernetesConfig has Basic loadBalancerSku with loadBalancerOutboundIPs config": {
+			properties: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					OrchestratorType:    "Kubernetes",
+					OrchestratorVersion: "1.18.1",
+					KubernetesConfig: &KubernetesConfig{
+						LoadBalancerSku:             BasicLoadBalancerSku,
+						ExcludeMasterFromStandardLB: to.BoolPtr(true),
+						LoadBalancerOutboundIPs:     to.IntPtr(3),
+					},
+				},
+			},
+			expectedError: "kubernetesConfig.loadBalancerOutboundIPs configuration only supported for Standard loadBalancerSku=Standard",
+		},
+		"should error when too many loadBalancerOutboundIPs are configured": {
+			properties: &Properties{
+				OrchestratorProfile: &OrchestratorProfile{
+					OrchestratorType:    "Kubernetes",
+					OrchestratorVersion: "1.18.1",
+					KubernetesConfig: &KubernetesConfig{
+						LoadBalancerOutboundIPs: to.IntPtr(17),
+					},
+				},
+			},
+			expectedError: fmt.Sprintf("kubernetesConfig.loadBalancerOutboundIPs was set to %d, the maximum allowed is %d", 17, common.MaxLoadBalancerOutboundIPs),
+		},
 		"should error when KubernetesConfig has enablePodSecurity enabled with invalid settings": {
 			properties: &Properties{
 				OrchestratorProfile: &OrchestratorProfile{
@@ -507,6 +533,15 @@ func Test_KubernetesConfig_Validate(t *testing.T) {
 		}
 
 		c = KubernetesConfig{
+			ClusterSubnet: "192.168.0.1/24",
+			NetworkPlugin: "azure",
+		}
+
+		if err := c.Validate(k8sVersion, false, false, false); err == nil {
+			t.Error("should error when ClusterSubnet has a mask of 24 bits or higher")
+		}
+
+		c = KubernetesConfig{
 			ProxyMode: KubeProxyMode("invalid"),
 		}
 
@@ -563,15 +598,6 @@ func Test_KubernetesConfig_Validate(t *testing.T) {
 
 		if err := c.Validate(k8sVersion, false, false, false); err == nil {
 			t.Error("should error when more than 1 cluster subnet provided with ipv6dualstack feature disabled")
-		}
-
-		// validate config when ipv6 dual stack feature is enabled
-		c = KubernetesConfig{
-			NetworkPlugin: "azure",
-		}
-
-		if err := c.Validate(k8sVersion, false, true, false); err == nil {
-			t.Error("should error when network plugin is not kubenet")
 		}
 
 		c = KubernetesConfig{
@@ -635,6 +661,30 @@ func Test_KubernetesConfig_Validate(t *testing.T) {
 
 		if err := c.Validate(k8sVersion, false, true, false); err != nil {
 			t.Error("shouldn't have errored with ipv6 dual stack feature enabled")
+		}
+
+		// validate config with azure cni dual stack and network policy enabled.
+		c = KubernetesConfig{
+			NetworkPlugin: "azure",
+			ClusterSubnet: "10.240.0.0/12,fe80:20d::/112",
+			NetworkPolicy: "azure",
+		}
+
+		if err := c.Validate(k8sVersion, false, true, false); err == nil {
+			t.Errorf("should error when network policy defined for azure cni dual stack: %v", err)
+		}
+
+		//validate azure cni dual stack enabled scenario
+		c = KubernetesConfig{
+			NetworkPlugin: "azure",
+			ClusterSubnet: "10.240.0.0/16,ace:cab:deca::/8",
+			ProxyMode:     "ipvs",
+			ServiceCidr:   "10.0.0.0/16,fe80:20d::/112",
+			DNSServiceIP:  "10.0.0.10",
+		}
+
+		if err := c.Validate(k8sVersion, false, true, false); err != nil {
+			t.Errorf("shouldn't have errored with azure cni ipv6 dual stack feature enabled: %v", err)
 		}
 	}
 
@@ -1077,17 +1127,6 @@ func TestProperties_ValidateWindowsProfile(t *testing.T) {
 				CSIProxyURL:    "http://some/url",
 			},
 			expectedError: errors.New("CSI proxy for Windows is only available in Kubernetes versions 1.18.0 or greater"),
-		},
-		{
-			name:       "CSI Proxy no URL",
-			k8sRelease: "1.18",
-			wp: &WindowsProfile{
-				AdminUsername:  "AzureUser",
-				AdminPassword:  "replacePassword1234$",
-				EnableCSIProxy: &trueVar,
-				CSIProxyURL:    "",
-			},
-			expectedError: errors.New("windowsProfile.csiProxyURL must be specified if enableCSIProxy is set"),
 		},
 	}
 
@@ -3495,11 +3534,11 @@ func TestProperties_ValidateVNET(t *testing.T) {
 		{
 			name: "Invalid MasterProfile FirstConsecutiveStaticIP when master is VMAS",
 			masterProfile: &MasterProfile{
+				FirstConsecutiveStaticIP: "10.0.0.invalid",
 				VnetSubnetID:             validVNetSubnetID,
 				Count:                    1,
 				DNSPrefix:                "foo",
 				VMSize:                   "Standard_DS2_v2",
-				FirstConsecutiveStaticIP: "10.0.0.invalid",
 			},
 			agentPoolProfiles: []*AgentPoolProfile{
 				{
@@ -3556,11 +3595,11 @@ func TestProperties_ValidateVNET(t *testing.T) {
 		{
 			name: "Invalid vnetcidr",
 			masterProfile: &MasterProfile{
+				FirstConsecutiveStaticIP: "10.0.0.1",
 				VnetSubnetID:             validVNetSubnetID,
 				Count:                    1,
 				DNSPrefix:                "foo",
 				VMSize:                   "Standard_DS2_v2",
-				FirstConsecutiveStaticIP: "10.0.0.1",
 				VnetCidr:                 "10.1.0.0/invalid",
 			},
 			agentPoolProfiles: []*AgentPoolProfile{
@@ -3834,7 +3873,7 @@ func TestAgentPoolProfile_ValidateAvailabilityProfile(t *testing.T) {
 		cs := getK8sDefaultContainerService(false)
 		agentPoolProfiles := cs.Properties.AgentPoolProfiles
 		agentPoolProfiles[0].SinglePlacementGroup = to.BoolPtr(true)
-		expectedMsg := fmt.Sprintf("singlePlacementGroup is only supported with VirtualMachineScaleSets")
+		expectedMsg := "singlePlacementGroup is only supported with VirtualMachineScaleSets"
 		if err := cs.Properties.validateAgentPoolProfiles(true); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
@@ -3845,7 +3884,7 @@ func TestAgentPoolProfile_ValidateAvailabilityProfile(t *testing.T) {
 		cs := getK8sDefaultContainerService(false)
 		agentPoolProfiles := cs.Properties.AgentPoolProfiles
 		agentPoolProfiles[0].SinglePlacementGroup = to.BoolPtr(false)
-		expectedMsg := fmt.Sprintf("singlePlacementGroup is only supported with VirtualMachineScaleSets")
+		expectedMsg := "singlePlacementGroup is only supported with VirtualMachineScaleSets"
 		if err := cs.Properties.validateAgentPoolProfiles(true); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
@@ -3895,7 +3934,7 @@ func TestAgentPoolProfile_ValidateVirtualMachineScaleSet(t *testing.T) {
 		cs.Properties.MasterProfile.AvailabilityProfile = VirtualMachineScaleSets
 		cs.Properties.MasterProfile.VnetSubnetID = "vnet"
 		cs.Properties.MasterProfile.FirstConsecutiveStaticIP = "10.10.10.240"
-		expectedMsg := fmt.Sprintf("when masterProfile's availabilityProfile is VirtualMachineScaleSets and a vnetSubnetID is specified, the firstConsecutiveStaticIP should be empty and will be determined by an offset from the first IP in the vnetCidr")
+		expectedMsg := "when masterProfile's availabilityProfile is VirtualMachineScaleSets and a vnetSubnetID is specified, the firstConsecutiveStaticIP should be empty and will be determined by an offset from the first IP in the vnetCidr"
 		if err := cs.Properties.validateMasterProfile(false); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
@@ -3907,7 +3946,7 @@ func TestAgentPoolProfile_ValidateVirtualMachineScaleSet(t *testing.T) {
 		cs.Properties.MasterProfile.AvailabilityProfile = VirtualMachineScaleSets
 		agentPoolProfiles := cs.Properties.AgentPoolProfiles
 		agentPoolProfiles[0].AvailabilityProfile = AvailabilitySet
-		expectedMsg := fmt.Sprintf("VirtualMachineScaleSets for master profile must be used together with virtualMachineScaleSets for agent profiles. Set \"availabilityProfile\" to \"VirtualMachineScaleSets\" for agent profiles")
+		expectedMsg := "VirtualMachineScaleSets for master profile must be used together with virtualMachineScaleSets for agent profiles. Set \"availabilityProfile\" to \"VirtualMachineScaleSets\" for agent profiles"
 		if err := cs.Properties.validateMasterProfile(false); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
@@ -3937,7 +3976,7 @@ func TestAgentPoolProfile_ValidateVirtualMachineScaleSet(t *testing.T) {
 		agentPoolProfiles := cs.Properties.AgentPoolProfiles
 		agentPoolProfiles[0].AvailabilityProfile = VirtualMachineScaleSets
 		agentPoolProfiles[1].AvailabilityProfile = AvailabilitySet
-		expectedMsg := fmt.Sprintf("mixed mode availability profiles are not allowed. Please set either VirtualMachineScaleSets or AvailabilitySet in availabilityProfile for all agent pools")
+		expectedMsg := "mixed mode availability profiles are not allowed. Please set either VirtualMachineScaleSets or AvailabilitySet in availabilityProfile for all agent pools"
 		if err := cs.Properties.validateAgentPoolProfiles(false); err.Error() != expectedMsg {
 			t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 		}
@@ -3989,7 +4028,7 @@ func TestMasterProfile_ValidateAuditDEnabled(t *testing.T) {
 			masterProfile.AuditDEnabled = to.BoolPtr(true)
 			switch distro {
 			case RHEL:
-				expectedMsg := fmt.Sprintf("You have enabled auditd for master vms, but you did not specify an Ubuntu-based distro.")
+				expectedMsg := "You have enabled auditd for master vms, but you did not specify an Ubuntu-based distro."
 				if err := cs.Properties.validateMasterProfile(false); err.Error() != expectedMsg {
 					t.Errorf("expected error with message : %s, but got %s", expectedMsg, err.Error())
 				}
@@ -4869,6 +4908,72 @@ func TestValidateKubernetesImageBaseType(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 			err := test.k.validateKubernetesImageBaseType()
+			if !helpers.EqualError(err, test.expectedError) {
+				t.Errorf("expected error: %v, got: %v", test.expectedError, err)
+			}
+		})
+	}
+}
+
+func TestValidateContainerRuntimeConfig(t *testing.T) {
+	tests := map[string]struct {
+		k             *KubernetesConfig
+		expectedError error
+	}{
+		"should succeed if unspecified with docker": {
+			k:             &KubernetesConfig{},
+			expectedError: nil,
+		},
+		"should succeed if unspecified with containerd": {
+			k: &KubernetesConfig{
+				ContainerRuntime: Containerd,
+			},
+			expectedError: nil,
+		},
+		"should succeed if config is defined but key not present": {
+			k: &KubernetesConfig{
+				ContainerRuntimeConfig: map[string]string{},
+			},
+			expectedError: nil,
+		},
+		"should succeed with containerd if config is defined but key not present": {
+			k: &KubernetesConfig{
+				ContainerRuntime:       Containerd,
+				ContainerRuntimeConfig: map[string]string{},
+			},
+			expectedError: nil,
+		},
+		"should fail on empty string": {
+			k: &KubernetesConfig{
+				ContainerRuntimeConfig: map[string]string{
+					ContainerDataDirKey: "",
+				},
+			},
+			expectedError: errors.Errorf("OrchestratorProfile.KubernetesConfig.ContainerRuntimeConfig.DataDir '' is invalid: must not be empty"),
+		},
+		"should fail on relative path": {
+			k: &KubernetesConfig{
+				ContainerRuntimeConfig: map[string]string{
+					ContainerDataDirKey: "mnt/docker",
+				},
+			},
+			expectedError: errors.Errorf("OrchestratorProfile.KubernetesConfig.ContainerRuntimeConfig.DataDir 'mnt/docker' is invalid: must be absolute path"),
+		},
+		"should pass with absolute path": {
+			k: &KubernetesConfig{
+				ContainerRuntimeConfig: map[string]string{
+					ContainerDataDirKey: "/mnt/docker",
+				},
+			},
+			expectedError: nil,
+		},
+	}
+
+	for testName, test := range tests {
+		test := test
+		t.Run(testName, func(t *testing.T) {
+			t.Parallel()
+			err := test.k.validateContainerRuntimeConfig()
 			if !helpers.EqualError(err, test.expectedError) {
 				t.Errorf("expected error: %v, got: %v", test.expectedError, err)
 			}

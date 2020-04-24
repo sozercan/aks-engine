@@ -164,7 +164,7 @@ type WindowsProfile struct {
 	AdminPassword          string            `json:"adminPassword,omitempty"`
 	CSIProxyURL            string            `json:"csiProxyURL,omitempty"`
 	EnableCSIProxy         *bool             `json:"enableCSIProxy,omitempty"`
-	ImageRef               *ImageReference   `json:"imageReference,omiteempty"`
+	ImageRef               *ImageReference   `json:"imageReference,omitempty"`
 	ImageVersion           string            `json:"imageVersion,omitempty"`
 	WindowsImageSourceURL  string            `json:"WindowsImageSourceUrl"`
 	WindowsPublisher       string            `json:"WindowsPublisher"`
@@ -172,7 +172,7 @@ type WindowsProfile struct {
 	WindowsSku             string            `json:"WindowsSku"`
 	WindowsDockerVersion   string            `json:"windowsDockerVersion"`
 	Secrets                []KeyVaultSecrets `json:"secrets,omitempty"`
-	SSHEnabled             bool              `json:"sshEnabled,omitempty"`
+	SSHEnabled             *bool             `json:"sshEnabled,omitempty"`
 	EnableAutomaticUpdates *bool             `json:"enableAutomaticUpdates,omitempty"`
 }
 
@@ -348,6 +348,7 @@ type KubernetesConfig struct {
 	EnablePodSecurityPolicy           *bool                 `json:"enablePodSecurityPolicy,omitempty"`
 	Addons                            []KubernetesAddon     `json:"addons,omitempty"`
 	Components                        []KubernetesComponent `json:"components,omitempty"`
+	ContainerRuntimeConfig            map[string]string     `json:"containerRuntimeConfig,omitempty"`
 	KubeletConfig                     map[string]string     `json:"kubeletConfig,omitempty"`
 	ControllerManagerConfig           map[string]string     `json:"controllerManagerConfig,omitempty"`
 	CloudControllerManagerConfig      map[string]string     `json:"cloudControllerManagerConfig,omitempty"`
@@ -368,6 +369,7 @@ type KubernetesConfig struct {
 	CloudProviderDisableOutboundSNAT  *bool                 `json:"cloudProviderDisableOutboundSNAT,omitempty"`
 	LoadBalancerSku                   string                `json:"loadBalancerSku,omitempty"`
 	ExcludeMasterFromStandardLB       *bool                 `json:"excludeMasterFromStandardLB,omitempty"`
+	LoadBalancerOutboundIPs           *int                  `json:"loadBalancerOutboundIPs,omitempty"`
 	AzureCNIVersion                   string                `json:"azureCNIVersion,omitempty"`
 	AzureCNIURLLinux                  string                `json:"azureCNIURLLinux,omitempty"`
 	AzureCNIURLWindows                string                `json:"azureCNIURLWindows,omitempty"`
@@ -432,7 +434,7 @@ type MasterProfile struct {
 	AgentSubnet               string            `json:"agentSubnet,omitempty"`
 	AvailabilityZones         []string          `json:"availabilityZones,omitempty"`
 	SinglePlacementGroup      *bool             `json:"singlePlacementGroup,omitempty"`
-	PlatformFaultDomainCount  *int              `json:"platformFaultDomainCount,omitEmpty"`
+	PlatformFaultDomainCount  *int              `json:"platformFaultDomainCount,omitempty"`
 	PlatformUpdateDomainCount *int              `json:"platformUpdateDomainCount"`
 	AuditDEnabled             *bool             `json:"auditDEnabled,omitempty"`
 	CustomVMTags              map[string]string `json:"customVMTags,omitempty"`
@@ -520,7 +522,7 @@ type AgentPoolProfile struct {
 	PreProvisionExtension             *Extension        `json:"preProvisionExtension"`
 	Extensions                        []Extension       `json:"extensions"`
 	SinglePlacementGroup              *bool             `json:"singlePlacementGroup,omitempty"`
-	PlatformFaultDomainCount          *int              `json:"platformFaultDomainCount,omitEmpty"`
+	PlatformFaultDomainCount          *int              `json:"platformFaultDomainCount,omitempty"`
 	PlatformUpdateDomainCount         *int              `json:"platformUpdateDomainCount"`
 	AvailabilityZones                 []string          `json:"availabilityZones,omitempty"`
 	EnableVMSSNodePublicIP            *bool             `json:"enableVMSSNodePublicIP,omitempty"`

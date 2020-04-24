@@ -53,6 +53,7 @@ type KubernetesSpecConfig struct {
 	VnetCNILinuxPluginsDownloadURL   string `json:"vnetCNILinuxPluginsDownloadURL,omitempty"`
 	VnetCNIWindowsPluginsDownloadURL string `json:"vnetCNIWindowsPluginsDownloadURL,omitempty"`
 	ContainerdDownloadURLBase        string `json:"containerdDownloadURLBase,omitempty"`
+	CSIProxyDownloadURL              string `json:"csiProxyDownloadURL,omitempty"`
 }
 
 //AzureEndpointConfig describes an Azure endpoint
@@ -99,6 +100,7 @@ var (
 		VnetCNILinuxPluginsDownloadURL:   "https://kubernetesartifacts.azureedge.net/azure-cni/" + AzureCniPluginVerLinux + "/binaries/azure-vnet-cni-linux-amd64-" + AzureCniPluginVerLinux + ".tgz",
 		VnetCNIWindowsPluginsDownloadURL: "https://kubernetesartifacts.azureedge.net/azure-cni/" + AzureCniPluginVerWindows + "/binaries/azure-vnet-cni-windows-amd64-" + AzureCniPluginVerWindows + ".zip",
 		ContainerdDownloadURLBase:        "https://storage.googleapis.com/cri-containerd-release/",
+		CSIProxyDownloadURL:              "https://kubernetesartifacts.azureedge.net/csi-proxy/v0.1.0/binaries/csi-proxy.tar.gz",
 	}
 
 	//DefaultDCOSSpecConfig is the default DC/OS binary download URL.
@@ -156,7 +158,7 @@ var (
 		ImageOffer:     "aks",
 		ImageSku:       "aks-engine-ubuntu-1604-202004",
 		ImagePublisher: "microsoft-aks",
-		ImageVersion:   "2020.04.09",
+		ImageVersion:   "2020.04.21",
 	}
 
 	// AKSUbuntu1804OSImageConfig is the AKS image based on Ubuntu 18.04-LTS.
@@ -164,7 +166,7 @@ var (
 		ImageOffer:     "aks",
 		ImageSku:       "aks-engine-ubuntu-1804-202004",
 		ImagePublisher: "microsoft-aks",
-		ImageVersion:   "2020.04.09",
+		ImageVersion:   "2020.04.21",
 	}
 
 	// AKSWindowsServer2019OSImageConfig is the AKS image based on Windows Server 2019
@@ -172,7 +174,7 @@ var (
 		ImageOffer:     "aks-windows",
 		ImageSku:       "2019-datacenter-core-smalldisk-2004",
 		ImagePublisher: "microsoft-aks",
-		ImageVersion:   "17763.1098.200409",
+		ImageVersion:   "17763.1158.200421",
 	}
 
 	// WindowsServer2019OSImageConfig is the 'vanilla' Windows Server 2019 image
@@ -180,7 +182,7 @@ var (
 		ImageOffer:     "WindowsServer",
 		ImageSku:       "2019-Datacenter-Core-with-Containers-smalldisk",
 		ImagePublisher: "MicrosoftWindowsServer",
-		ImageVersion:   "17763.1098.2003062342",
+		ImageVersion:   "17763.1158.2004131759",
 	}
 
 	// ACC1604OSImageConfig is the ACC image based on Ubuntu 16.04.
@@ -283,6 +285,7 @@ var (
 			VnetCNILinuxPluginsDownloadURL:   "https://mirror.azk8s.cn/kubernetes/azure-container-networking/azure-vnet-cni-linux-amd64-" + AzureCniPluginVerLinux + ".tgz",
 			VnetCNIWindowsPluginsDownloadURL: "https://mirror.azk8s.cn/kubernetes/azure-container-networking/azure-vnet-cni-windows-amd64-" + AzureCniPluginVerWindows + ".zip",
 			ContainerdDownloadURLBase:        "https://mirror.azk8s.cn/kubernetes/containerd/",
+			CSIProxyDownloadURL:              "https://kubernetesartifacts.blob.core.chinacloudapi.cn/csi-proxy/v0.1.0/binaries/csi-proxy.tar.gz",
 		},
 		DCOSSpecConfig: DCOSSpecConfig{
 			DCOS188BootstrapDownloadURL:     fmt.Sprintf(AzureChinaCloudDCOSBootstrapDownloadURL, "5df43052907c021eeb5de145419a3da1898c58a5"),

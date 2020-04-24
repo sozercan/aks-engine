@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/to"
 
+	"github.com/Azure/aks-engine/pkg/api/common"
 	"github.com/Azure/aks-engine/pkg/api/vlabs"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/google/go-cmp/cmp"
@@ -171,6 +172,7 @@ func TestConvertAzureEnvironmentSpecConfigToVLabs(t *testing.T) {
 						VnetCNILinuxPluginsDownloadURL:   "VnetCNILinuxPluginsDownloadURL",
 						VnetCNIWindowsPluginsDownloadURL: "VnetCNIWindowsPluginsDownloadURL",
 						ContainerdDownloadURLBase:        "ContainerdDownloadURLBase",
+						CSIProxyDownloadURL:              "CSIProxyDownloadURL",
 					},
 					DCOSSpecConfig: DCOSSpecConfig{
 						DCOS188BootstrapDownloadURL:     "DCOS188BootstrapDownloadURL",
@@ -252,6 +254,9 @@ func TestConvertAzureEnvironmentSpecConfigToVLabs(t *testing.T) {
 	}
 	if vlabscsSpec.KubernetesSpecConfig.ContainerdDownloadURLBase != csSpec.KubernetesSpecConfig.ContainerdDownloadURLBase {
 		t.Errorf("incorrect ContainerdDownloadURLBase, expect: '%s', actual: '%s'", csSpec.KubernetesSpecConfig.ContainerdDownloadURLBase, vlabscsSpec.KubernetesSpecConfig.ContainerdDownloadURLBase)
+	}
+	if vlabscsSpec.KubernetesSpecConfig.CSIProxyDownloadURL != csSpec.KubernetesSpecConfig.CSIProxyDownloadURL {
+		t.Errorf("incorrect CSIProxyDownloadURL, expect: '%s', actual: '%s'", csSpec.KubernetesSpecConfig.CSIProxyDownloadURL, vlabscsSpec.KubernetesSpecConfig.CSIProxyDownloadURL)
 	}
 
 	//DockerSpecConfig
@@ -507,11 +512,14 @@ func getDefaultContainerService() *ContainerService {
 					ResourceGroup: "FooImageRefResourceGroup",
 				},
 				KubernetesConfig: &KubernetesConfig{
-					KubernetesImageBase:             "quay.io",
-					ClusterSubnet:                   "fooClusterSubnet",
-					NetworkPolicy:                   "calico",
-					NetworkPlugin:                   "azure-cni",
-					ContainerRuntime:                "docker",
+					KubernetesImageBase: "quay.io",
+					ClusterSubnet:       "fooClusterSubnet",
+					NetworkPolicy:       "calico",
+					NetworkPlugin:       "azure-cni",
+					ContainerRuntime:    "docker",
+					ContainerRuntimeConfig: map[string]string{
+						common.ContainerDataDirKey: "/mnt/docker",
+					},
 					MaxPods:                         3,
 					DockerBridgeSubnet:              "sampleDockerSubnet",
 					DNSServiceIP:                    "172.0.0.1",
@@ -540,7 +548,7 @@ func getDefaultContainerService() *ContainerService {
 					EtcdVersion:                     "3.0.0",
 					EtcdDiskSizeGB:                  "256",
 					EtcdEncryptionKey:               "sampleEncruptionKey",
-					AzureCNIVersion:                 "1.0.33",
+					AzureCNIVersion:                 "1.1.0",
 					AzureCNIURLLinux:                "https://mirror.azk8s.cn/kubernetes/azure-container-networking/linux",
 					AzureCNIURLWindows:              "https://mirror.azk8s.cn/kubernetes/azure-container-networking/windows",
 					KeyVaultSku:                     "Basic",
@@ -764,7 +772,7 @@ func TestConvertWindowsProfileToVlabs(t *testing.T) {
 				AdminPassword:          "password",
 				EnableAutomaticUpdates: &falseVar,
 				ImageVersion:           "17763.615.1907121548",
-				SSHEnabled:             false,
+				SSHEnabled:             &falseVar,
 				WindowsPublisher:       "MicrosoftWindowsServer",
 				WindowsOffer:           "WindowsServer",
 				WindowsSku:             "2019-Datacenter-Core-smalldisk",
@@ -775,7 +783,7 @@ func TestConvertWindowsProfileToVlabs(t *testing.T) {
 				AdminPassword:          "password",
 				EnableAutomaticUpdates: &falseVar,
 				ImageVersion:           "17763.615.1907121548",
-				SSHEnabled:             false,
+				SSHEnabled:             &falseVar,
 				WindowsPublisher:       "MicrosoftWindowsServer",
 				WindowsOffer:           "WindowsServer",
 				WindowsSku:             "2019-Datacenter-Core-smalldisk",

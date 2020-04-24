@@ -880,9 +880,9 @@ func TestNetworkPolicyDefaults(t *testing.T) {
 	properties.OrchestratorProfile.OrchestratorType = Kubernetes
 	properties.OrchestratorProfile.KubernetesConfig.NetworkPolicy = NetworkPolicyAntrea
 	mockCS.setOrchestratorDefaults(true, true)
-	if properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin != NetworkPluginAntrea {
+	if properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin != NetworkPluginAzure {
 		t.Fatalf("NetworkPlugin did not have the expected value, got %s, expected %s",
-			properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin, NetworkPluginAntrea)
+			properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin, NetworkPluginAzure)
 	}
 
 	mockCS = getMockBaseContainerService("1.8.10")
@@ -1627,6 +1627,94 @@ func TestMasterProfileDefaults(t *testing.T) {
 			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
 	}
 
+	// this validates cluster subnet default configuration for azure cni dual stack feature.
+	mockCS = getMockBaseContainerService("1.16.0")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin = "azure"
+	properties.FeatureFlags = &FeatureFlags{EnableIPv6DualStack: true}
+	mockCS.SetPropertiesDefaults(PropertiesDefaultsParams{
+		IsScale:    false,
+		IsUpgrade:  false,
+		PkiKeySize: helpers.DefaultPkiKeySize,
+	})
+	expectedClusterSubnet = strings.Join([]string{DefaultKubernetesSubnet, "fc00::/8"}, ",")
+	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
+			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
+	// this validates cluster subnet default configuration for azure cni dual stack feature when only ipv4 subnet provided
+	mockCS = getMockBaseContainerService("1.16.0")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin = "azure"
+	properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet = "10.240.1.0/24"
+	properties.FeatureFlags = &FeatureFlags{EnableIPv6DualStack: true}
+	mockCS.SetPropertiesDefaults(PropertiesDefaultsParams{
+		IsScale:    false,
+		IsUpgrade:  false,
+		PkiKeySize: helpers.DefaultPkiKeySize,
+	})
+	expectedClusterSubnet = strings.Join([]string{"10.240.1.0/24", "fc00::/8"}, ",")
+	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
+			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
+	// this validates cluster subnet default configuration for azure cni dual stack feature when only ipv6 subnet provided
+	mockCS = getMockBaseContainerService("1.16.0")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin = "azure"
+	properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet = "ace:cab:deca::/8"
+	properties.FeatureFlags = &FeatureFlags{EnableIPv6DualStack: true}
+	mockCS.SetPropertiesDefaults(PropertiesDefaultsParams{
+		IsScale:    false,
+		IsUpgrade:  false,
+		PkiKeySize: helpers.DefaultPkiKeySize,
+	})
+	expectedClusterSubnet = strings.Join([]string{DefaultKubernetesSubnet, "ace:cab:deca::/8"}, ",")
+	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
+			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
+	// this validates cluster subnet default configuration for azure cni dual stack feature when both ipv4 and ipv6 subnet provided
+	mockCS = getMockBaseContainerService("1.16.0")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin = "azure"
+	properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet = "10.240.1.0/24,ace:cab:deca::/8"
+	properties.FeatureFlags = &FeatureFlags{EnableIPv6DualStack: true}
+	mockCS.SetPropertiesDefaults(PropertiesDefaultsParams{
+		IsScale:    false,
+		IsUpgrade:  false,
+		PkiKeySize: helpers.DefaultPkiKeySize,
+	})
+	expectedClusterSubnet = strings.Join([]string{"10.240.1.0/24", "ace:cab:deca::/8"}, ",")
+	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
+			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
+	// this validates cluster subnet default configuration for azure cni dual stack feature for k8s 1.17 version
+	mockCS = getMockBaseContainerService("1.17.0")
+	properties = mockCS.Properties
+	properties.OrchestratorProfile.OrchestratorType = Kubernetes
+	properties.OrchestratorProfile.KubernetesConfig.NetworkPlugin = "azure"
+	properties.FeatureFlags = &FeatureFlags{EnableIPv6DualStack: true}
+	mockCS.SetPropertiesDefaults(PropertiesDefaultsParams{
+		IsScale:    false,
+		IsUpgrade:  false,
+		PkiKeySize: helpers.DefaultPkiKeySize,
+	})
+	expectedClusterSubnet = strings.Join([]string{DefaultKubernetesSubnet, DefaultKubernetesClusterSubnetIPv6}, ",")
+	if properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet != expectedClusterSubnet {
+		t.Fatalf("OrchestratorProfile.KubernetesConfig.ClusterSubnet did not have the expected configuration, got %s, expected %s",
+			properties.OrchestratorProfile.KubernetesConfig.ClusterSubnet, expectedClusterSubnet)
+	}
+
 	// this validates default configurations for OutboundRuleIdleTimeoutInMinutes.
 	mockCS = getMockBaseContainerService("1.14.4")
 	properties = mockCS.Properties
@@ -1913,6 +2001,7 @@ func TestDistroDefaults(t *testing.T) {
 }
 
 func TestWindowsProfileDefaults(t *testing.T) {
+	trueVar := true
 
 	var tests = []struct {
 		name                   string // test case name
@@ -1934,7 +2023,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -1955,7 +2044,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -1977,7 +2066,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -1999,7 +2088,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2020,7 +2109,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2042,7 +2131,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2064,7 +2153,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2087,7 +2176,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2109,7 +2198,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2132,7 +2221,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            &trueVar,
 			},
 			false,
 			false,
@@ -2155,7 +2244,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2178,7 +2267,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2201,7 +2290,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2224,7 +2313,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2247,7 +2336,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2270,7 +2359,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			true,
@@ -2293,7 +2382,7 @@ func TestWindowsProfileDefaults(t *testing.T) {
 				AdminPassword:         "",
 				WindowsImageSourceURL: "",
 				WindowsDockerVersion:  "",
-				SSHEnabled:            false,
+				SSHEnabled:            nil,
 			},
 			false,
 			false,
@@ -3022,6 +3111,7 @@ func TestSetCustomCloudProfileDefaults(t *testing.T) {
 			VnetCNILinuxPluginsDownloadURL:   "VnetCNILinuxPluginsDownloadURL",
 			VnetCNIWindowsPluginsDownloadURL: "VnetCNIWindowsPluginsDownloadURL",
 			ContainerdDownloadURLBase:        "ContainerdDownloadURLBase",
+			CSIProxyDownloadURL:              "CSIProxyDownloadURL",
 		},
 		DCOSSpecConfig: DefaultDCOSSpecConfig,
 		EndpointConfig: AzureEndpointConfig{
@@ -3076,6 +3166,7 @@ func TestSetCustomCloudProfileDefaults(t *testing.T) {
 			CNIPluginsDownloadURL:          "CNIPluginsDownloadURL",
 			VnetCNILinuxPluginsDownloadURL: "VnetCNILinuxPluginsDownloadURL",
 			ContainerdDownloadURLBase:      "ContainerdDownloadURLBase",
+			CSIProxyDownloadURL:            "CSIProxyDownloadURL",
 		},
 		DCOSSpecConfig: DefaultDCOSSpecConfig,
 		EndpointConfig: AzureEndpointConfig{
@@ -4878,6 +4969,84 @@ func TestDefaultIPAddressCount(t *testing.T) {
 			}
 			if c.cs.Properties.AgentPoolProfiles[1].IPAddressCount != c.expectedPool1 {
 				t.Errorf("expected %d, but got %d", c.expectedPool1, c.cs.Properties.AgentPoolProfiles[1].IPAddressCount)
+			}
+		})
+	}
+}
+
+func TestSetCSIProxyDefaults(t *testing.T) {
+	cases := []struct {
+		name                      string
+		windowsProfile            *WindowsProfile
+		useCloudControllerManager bool
+		expectedEnableCSIProxy    bool
+		expectedCSIProxyURL       string
+	}{
+		{
+			name: "enabledCSIProxy is nil and useCloudControllerManager is disabled",
+			windowsProfile: &WindowsProfile{
+				EnableCSIProxy: nil,
+				CSIProxyURL:    "",
+			},
+			useCloudControllerManager: false,
+			expectedEnableCSIProxy:    false,
+			expectedCSIProxyURL:       "",
+		},
+		{
+			name: "enabledCSIProxy is nil and useCloudControllerManager is enabled",
+			windowsProfile: &WindowsProfile{
+				EnableCSIProxy: nil,
+				CSIProxyURL:    "",
+			},
+			useCloudControllerManager: true,
+			expectedEnableCSIProxy:    true,
+			expectedCSIProxyURL:       DefaultKubernetesSpecConfig.CSIProxyDownloadURL,
+		},
+		{
+			name: "enabledCSIProxy is nil and CSIProxyURL is defined",
+			windowsProfile: &WindowsProfile{
+				EnableCSIProxy: nil,
+				CSIProxyURL:    "CSIProxyURL",
+			},
+			useCloudControllerManager: true,
+			expectedEnableCSIProxy:    true,
+			expectedCSIProxyURL:       "CSIProxyURL",
+		},
+		{
+			name: "enabledCSIProxy is false",
+			windowsProfile: &WindowsProfile{
+				EnableCSIProxy: to.BoolPtr(false),
+				CSIProxyURL:    "",
+			},
+			useCloudControllerManager: true,
+			expectedEnableCSIProxy:    false,
+			expectedCSIProxyURL:       "",
+		},
+		{
+			name: "enabledCSIProxy is true",
+			windowsProfile: &WindowsProfile{
+				EnableCSIProxy: to.BoolPtr(true),
+				CSIProxyURL:    "",
+			},
+			useCloudControllerManager: true,
+			expectedEnableCSIProxy:    true,
+			expectedCSIProxyURL:       DefaultKubernetesSpecConfig.CSIProxyDownloadURL,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			cs := getMockBaseContainerService("1.18.0")
+			cs.Properties.OrchestratorProfile.KubernetesConfig.UseCloudControllerManager = to.BoolPtr(c.useCloudControllerManager)
+			cs.Properties.WindowsProfile = c.windowsProfile
+			cs.setCSIProxyDefaults()
+			if to.Bool(cs.Properties.WindowsProfile.EnableCSIProxy) != c.expectedEnableCSIProxy {
+				t.Errorf("expected enableCSIProxy to be %t, but got %t", c.expectedEnableCSIProxy, to.Bool(cs.Properties.WindowsProfile.EnableCSIProxy))
+			}
+			if cs.Properties.WindowsProfile.CSIProxyURL != c.expectedCSIProxyURL {
+				t.Errorf("expected csiProxyURL to be %s, but got %s", DefaultKubernetesSpecConfig.CSIProxyDownloadURL, cs.Properties.WindowsProfile.CSIProxyURL)
 			}
 		})
 	}

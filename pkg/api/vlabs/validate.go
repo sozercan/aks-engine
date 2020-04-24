@@ -84,6 +84,10 @@ var (
 			networkPolicy: NetworkPolicyAntrea,
 		},
 		{
+			networkPlugin: "azure",
+			networkPolicy: NetworkPolicyAntrea,
+		},
+		{
 			networkPlugin: "",
 			networkPolicy: NetworkPolicyAntrea,
 		},
@@ -315,6 +319,12 @@ func (a *Properties) ValidateOrchestratorProfile(isUpdate bool) error {
 					}
 				}
 
+				if o.KubernetesConfig.LoadBalancerSku == BasicLoadBalancerSku {
+					if o.KubernetesConfig.LoadBalancerOutboundIPs != nil {
+						return errors.Errorf("kubernetesConfig.loadBalancerOutboundIPs configuration only supported for Standard loadBalancerSku=Standard")
+					}
+				}
+
 				if o.KubernetesConfig.DockerEngineVersion != "" {
 					log.Warnf("docker-engine is deprecated in favor of moby, but you passed in a dockerEngineVersion configuration. This will be ignored.")
 				}
@@ -322,6 +332,13 @@ func (a *Properties) ValidateOrchestratorProfile(isUpdate bool) error {
 				if o.KubernetesConfig.MaximumLoadBalancerRuleCount < 0 {
 					return errors.New("maximumLoadBalancerRuleCount shouldn't be less than 0")
 				}
+
+				if o.KubernetesConfig.LoadBalancerOutboundIPs != nil {
+					if to.Int(o.KubernetesConfig.LoadBalancerOutboundIPs) > common.MaxLoadBalancerOutboundIPs {
+						return errors.Errorf("kubernetesConfig.loadBalancerOutboundIPs was set to %d, the maximum allowed is %d", to.Int(o.KubernetesConfig.LoadBalancerOutboundIPs), common.MaxLoadBalancerOutboundIPs)
+					}
+				}
+
 				// https://docs.microsoft.com/en-us/azure/load-balancer/load-balancer-outbound-rules-overview
 				if o.KubernetesConfig.LoadBalancerSku == StandardLoadBalancerSku && o.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes != 0 && (o.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes < 4 || o.KubernetesConfig.OutboundRuleIdleTimeoutInMinutes > 120) {
 					return errors.New("outboundRuleIdleTimeoutInMinutes shouldn't be less than 4 or greater than 120")
@@ -1158,23 +1175,8 @@ func (a *Properties) validateWindowsProfile() error {
 }
 
 func validateCsiProxyWindowsProperties(w *WindowsProfile, k8sVersion string) error {
-	if w.IsCSIProxyEnabled() {
-		k8sSemVer, err := semver.Make(k8sVersion)
-		if err != nil {
-			return errors.Errorf("could not validate orchestrator version %s", k8sVersion)
-		}
-		minSemVer, err := semver.Make("1.18.0-beta.1")
-		if err != nil {
-			return errors.New("could not validate orchestrator version 1.18.0")
-		}
-
-		if k8sSemVer.LT(minSemVer) {
-			return errors.New("CSI proxy for Windows is only available in Kubernetes versions 1.18.0 or greater")
-		}
-
-		if len(w.CSIProxyURL) == 0 {
-			return errors.New("windowsProfile.csiProxyURL must be specified if enableCSIProxy is set")
-		}
+	if w.IsCSIProxyEnabled() && !common.IsKubernetesVersionGe(k8sVersion, "1.18.0") {
+		return errors.New("CSI proxy for Windows is only available in Kubernetes versions 1.18.0 or greater")
 	}
 	return nil
 }
@@ -1343,8 +1345,12 @@ func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStack
 			return errors.Errorf("IPv6 dual stack not available in kubernetes version %s", k8sVersion)
 		}
 		// ipv6 dual stack feature is currently only supported with kubenet
-		if k.NetworkPlugin != "kubenet" {
-			return errors.Errorf("OrchestratorProfile.KubernetesConfig.NetworkPlugin '%s' is invalid. IPv6 dual stack supported only with kubenet.", k.NetworkPlugin)
+		if k.NetworkPlugin != "kubenet" && k.NetworkPlugin != "azure" {
+			return errors.Errorf("OrchestratorProfile.KubernetesConfig.NetworkPlugin '%s' is invalid. IPv6 dual stack supported only with kubenet and azurecni.", k.NetworkPlugin)
+		}
+
+		if k.NetworkPlugin == "azure" && k.NetworkPolicy != "" {
+			return errors.Errorf("Network policy %s is not supported for azure cni dualstack", k.NetworkPolicy)
 		}
 	}
 
@@ -1565,6 +1571,32 @@ func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStack
 	if e := k.validateKubernetesImageBaseType(); e != nil {
 		return e
 	}
+	return k.validateContainerRuntimeConfig()
+}
+
+func (k *KubernetesConfig) validateContainerRuntimeConfig() error {
+	if val, ok := k.ContainerRuntimeConfig[common.ContainerDataDirKey]; ok {
+		if val == "" {
+			return errors.Errorf("OrchestratorProfile.KubernetesConfig.ContainerRuntimeConfig.DataDir '%s' is invalid: must not be empty", val)
+		}
+		if !strings.HasPrefix(val, "/") {
+			return errors.Errorf("OrchestratorProfile.KubernetesConfig.ContainerRuntimeConfig.DataDir '%s' is invalid: must be absolute path", val)
+		}
+	}
+
+	// Validate base config here, and only allow predefined mutations to ensure invariant.
+	if k.ContainerRuntime == Containerd {
+		_, err := common.GetContainerdConfig(k.ContainerRuntimeConfig, nil)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err := common.GetDockerConfig(k.ContainerRuntimeConfig, nil)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

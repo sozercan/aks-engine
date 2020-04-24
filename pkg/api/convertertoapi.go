@@ -200,7 +200,9 @@ func convertVLabsWindowsProfile(vlabs *vlabs.WindowsProfile, api *WindowsProfile
 		convertVLabsKeyVaultSecrets(&s, secret)
 		api.Secrets = append(api.Secrets, *secret)
 	}
-	api.SSHEnabled = vlabs.SSHEnabled
+	if vlabs.SSHEnabled != nil {
+		api.SSHEnabled = vlabs.SSHEnabled
+	}
 	api.EnableAutomaticUpdates = vlabs.EnableAutomaticUpdates
 }
 
@@ -318,6 +320,7 @@ func convertVLabsKubernetesConfig(vlabs *vlabs.KubernetesConfig, api *Kubernetes
 	api.UseInstanceMetadata = vlabs.UseInstanceMetadata
 	api.LoadBalancerSku = vlabs.LoadBalancerSku
 	api.ExcludeMasterFromStandardLB = vlabs.ExcludeMasterFromStandardLB
+	api.LoadBalancerOutboundIPs = vlabs.LoadBalancerOutboundIPs
 	api.EnableRbac = vlabs.EnableRbac
 	api.EnableSecureKubelet = vlabs.EnableSecureKubelet
 	api.EnableAggregatedAPIs = vlabs.EnableAggregatedAPIs
@@ -347,6 +350,7 @@ func convertVLabsKubernetesConfig(vlabs *vlabs.KubernetesConfig, api *Kubernetes
 	convertSchedulerConfigToAPI(vlabs, api)
 	convertPrivateClusterToAPI(vlabs, api)
 	convertPodSecurityPolicyConfigToAPI(vlabs, api)
+	convertContainerRuntimeConfigToAPI(vlabs, api)
 }
 
 func setVlabsKubernetesDefaults(vp *vlabs.Properties, api *OrchestratorProfile) {
@@ -456,6 +460,13 @@ func convertCustomFilesToAPI(v *vlabs.MasterProfile, a *MasterProfile) {
 				Source: (*v.CustomFiles)[i].Source,
 			})
 		}
+	}
+}
+
+func convertContainerRuntimeConfigToAPI(v *vlabs.KubernetesConfig, a *KubernetesConfig) {
+	a.ContainerRuntimeConfig = map[string]string{}
+	for key, val := range v.ContainerRuntimeConfig {
+		a.ContainerRuntimeConfig[key] = val
 	}
 }
 
@@ -812,6 +823,7 @@ func convertAzureEnvironmentSpecConfig(vlabses *vlabs.AzureEnvironmentSpecConfig
 		VnetCNILinuxPluginsDownloadURL:   vlabses.KubernetesSpecConfig.VnetCNILinuxPluginsDownloadURL,
 		VnetCNIWindowsPluginsDownloadURL: vlabses.KubernetesSpecConfig.VnetCNIWindowsPluginsDownloadURL,
 		ContainerdDownloadURLBase:        vlabses.KubernetesSpecConfig.ContainerdDownloadURLBase,
+		CSIProxyDownloadURL:              vlabses.KubernetesSpecConfig.CSIProxyDownloadURL,
 	}
 	api.OSImageConfig = map[Distro]AzureOSImageConfig{}
 	for k, v := range vlabses.OSImageConfig {

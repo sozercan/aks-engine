@@ -41,6 +41,8 @@ const (
 	DefaultInternalLbStaticIPOffset = 10
 	// DefaultEnableCSIProxyWindows determines if CSI proxy should be enabled by default for Windows nodes
 	DefaultEnableCSIProxyWindows = false
+	// MaxLoadBalancerOutboundIPs is the maximum number of outbound IPs in a Standard LoadBalancer frontend configuration
+	MaxLoadBalancerOutboundIPs = 16
 )
 
 // Availability profiles
@@ -206,16 +208,20 @@ const (
 	CSIProvisionerContainerName = "csi-provisioner"
 	// CSIAttacherContainerName is the name of the csi-attacher container in the azuredisk-csi-driver and azurefile-csi-driver addons
 	CSIAttacherContainerName = "csi-attacher"
-	// CSIClusterDriverRegistrarContainerName is the name of the csi-cluster-driver-registrar container in the azuredisk-csi-driver and azurefile-csi-driver addons
-	CSIClusterDriverRegistrarContainerName = "csi-cluster-driver-registrar"
 	// CSILivenessProbeContainerName is the name of the livenessprobe container in the azuredisk-csi-driver, azurefile-csi-driver and secrets-store-csi-driver addons
 	CSILivenessProbeContainerName = "livenessprobe"
-	// CSISnapshotterContainerName is the name of the csi-snapshotter container in the azuredisk-csi-driver addon
+	// CSILivenessProbeWindowsContainerName is the name of the livenessprobe-windows container in the azuredisk-csi-driver and azurefile-csi-driver addons
+	CSILivenessProbeWindowsContainerName = "livenessprobe-windows"
+	// CSISnapshotterContainerName is the name of the csi-snapshotter container in the azuredisk-csi-driver and azurefile-csi-driver addons
 	CSISnapshotterContainerName = "csi-snapshotter"
+	// CSISnapshotControllerContainerName is the name of the csi-snapshot-controller container
+	CSISnapshotControllerContainerName = "csi-snapshot-controller"
 	// CSIResizerContainerName is the name of the csi-resizer container in the azuredisk-csi-driver addon
 	CSIResizerContainerName = "csi-resizer"
 	// CSINodeDriverRegistrarContainerName is the name of the csi-node-driver-registrar container in the azuredisk-csi-driver, azurefile-csi-driver and secrets-store-csi-driver addons
 	CSINodeDriverRegistrarContainerName = "csi-node-driver-registrar"
+	// CSINodeDriverRegistrarWindowsContainerName is the name of the csi-node-driver-registrar-windows container in the azuredisk-csi-driver and azurefile-csi-driver addons
+	CSINodeDriverRegistrarWindowsContainerName = "csi-node-driver-registrar-windows"
 	// CSIAzureDiskContainerName is the name of the azuredisk-csi container in the azuredisk-csi-driver and azurefile-csi-driver addons
 	CSIAzureDiskContainerName = "azuredisk-csi"
 	// AzureFileCSIDriverAddonName is the name of Azure File CSI Driver addon
@@ -306,4 +312,62 @@ const (
 const (
 	KubernetesImageBaseTypeGCR = "gcr"
 	KubernetesImageBaseTypeMCR = "mcr"
+)
+
+var (
+	// DefaultDockerConfig describes the default configuration of the docker daemon.
+	DefaultDockerConfig = DockerConfig{
+		LiveRestore: true,
+		LogDriver:   "json-file",
+		LogOpts: LogOpts{
+			MaxSize: "50m",
+			MaxFile: "5",
+		},
+	}
+
+	// DefaultContainerdConfig describes the default configuration of the containerd daemon.
+	DefaultContainerdConfig = ContainerdConfig{
+		Version:  2,
+		OomScore: 0,
+		Plugins: Plugins{
+			IoContainerdGrpcV1Cri: IoContainerdGrpcV1Cri{
+				CNI: ContainerdCNIPlugin{},
+				Containerd: ContainerdPlugin{
+					DefaultRuntimeName: "runc",
+					Runtimes: map[string]ContainerdRuntime{
+						"runc": {
+							RuntimeType: "io.containerd.runc.v2",
+						},
+						// note: runc really should not be used for untrusted workloads... should we remove this? This is here because it was here before
+						"untrusted": {
+							RuntimeType: "io.containerd.runc.v2",
+						},
+					},
+				},
+			},
+		},
+	}
+)
+
+// GetDefaultDockerConfig returns the default docker config for processing.
+func GetDefaultDockerConfig() DockerConfig {
+	return DefaultDockerConfig
+}
+
+// GetDefaultContainerdConfig returns the default containerd config for processing.
+func GetDefaultContainerdConfig() ContainerdConfig {
+	return DefaultContainerdConfig
+}
+
+// Known container runtime configuration keys
+const (
+	ContainerDataDirKey = "dataDir"
+)
+
+// Antrea Plugin Const
+const (
+	AntreaDefaultTrafficEncapMode = "Encap"
+	AntreaDefaultInstallCniCmd    = "install_cni"
+	AntreaInstallCniChainCmd      = "install_cni_chaining"
+	AntreaNetworkPolicyOnlyMode   = "networkPolicyOnly"
 )

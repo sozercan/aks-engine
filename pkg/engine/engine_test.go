@@ -1876,9 +1876,9 @@ func TestGetClusterAutoscalerAddonFuncMap(t *testing.T) {
 			expectedMode:               api.AddonModeEnsureExists,
 			expectedNodesConfig:        "        - --nodes=1:10:k8s-pool1-49584119-vmss",
 			expectedVMType:             "dm1zcw==", // base 64 encoding of vmss
-			expectedVolumeMounts:       fmt.Sprintf("\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true"),
-			expectedVolumes:            fmt.Sprintf("\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent"),
-			expectedHostNetwork:        fmt.Sprintf("\n      hostNetwork: true"),
+			expectedVolumeMounts:       "\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true",
+			expectedVolumes:            "\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent",
+			expectedHostNetwork:        "\n      hostNetwork: true",
 			expectedCloud:              "AzurePublicCloud",
 			expectedUseManagedIdentity: "true",
 		},
@@ -1959,9 +1959,9 @@ func TestGetClusterAutoscalerAddonFuncMap(t *testing.T) {
 			expectedMode:               api.AddonModeEnsureExists,
 			expectedNodesConfig:        "        - --nodes=1:10:k8s-pool1-49584119-vmss\n        - --nodes=1:10:k8s-pool2-49584119-vmss",
 			expectedVMType:             "dm1zcw==", // base 64 encoding of vmss
-			expectedVolumeMounts:       fmt.Sprintf("\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true"),
-			expectedVolumes:            fmt.Sprintf("\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent"),
-			expectedHostNetwork:        fmt.Sprintf("\n      hostNetwork: true"),
+			expectedVolumeMounts:       "\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true",
+			expectedVolumes:            "\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent",
+			expectedHostNetwork:        "\n      hostNetwork: true",
 			expectedCloud:              "AzurePublicCloud",
 			expectedUseManagedIdentity: "true",
 		},
@@ -2026,9 +2026,9 @@ func TestGetClusterAutoscalerAddonFuncMap(t *testing.T) {
 			expectedMode:               api.AddonModeEnsureExists,
 			expectedNodesConfig:        "",
 			expectedVMType:             "dm1zcw==", // base 64 encoding of vmss
-			expectedVolumeMounts:       fmt.Sprintf("\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true"),
-			expectedVolumes:            fmt.Sprintf("\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent"),
-			expectedHostNetwork:        fmt.Sprintf("\n      hostNetwork: true"),
+			expectedVolumeMounts:       "\n        - mountPath: /var/lib/waagent/\n          name: waagent\n          readOnly: true",
+			expectedVolumes:            "\n      - hostPath:\n          path: /var/lib/waagent/\n        name: waagent",
+			expectedHostNetwork:        "\n      hostNetwork: true",
 			expectedCloud:              "AzurePublicCloud",
 			expectedUseManagedIdentity: "true",
 		},
@@ -2458,22 +2458,27 @@ func TestGetAddonFuncMap(t *testing.T) {
 	specConfig := api.AzureCloudSpecEnvMap["AzurePublicCloud"].KubernetesSpecConfig
 	k8sComponentsByVersionMap := api.GetK8sComponentsByVersionMap(&api.KubernetesConfig{KubernetesImageBaseType: common.KubernetesImageBaseTypeGCR})
 	cases := []struct {
-		name                                      string
-		addon                                     api.KubernetesAddon
-		cs                                        *api.ContainerService
-		expectedImage                             string
-		expectedCPUReqs                           string
-		expectedCPULimits                         string
-		expectedMemReqs                           string
-		expectedMemLimits                         string
-		expectedFoo                               string
-		expectedIsAzureStackCloud                 bool
-		expectedNeedsStorageAccountStorageClasses bool
-		expectedNeedsManagedDiskStorageClasses    bool
-		expectedUsesCloudControllerManager        bool
-		expectedHasAvailabilityZones              bool
-		expectedGetZones                          string
-		expectedHasWindows                        bool
+		name                                              string
+		addon                                             api.KubernetesAddon
+		cs                                                *api.ContainerService
+		expectedImage                                     string
+		expectedCPUReqs                                   string
+		expectedCPULimits                                 string
+		expectedMemReqs                                   string
+		expectedMemLimits                                 string
+		expectedFoo                                       string
+		expectedIsAzureStackCloud                         bool
+		expectedNeedsStorageAccountStorageClasses         bool
+		expectedNeedsManagedDiskStorageClasses            bool
+		expectedUsesCloudControllerManager                bool
+		expectedHasAvailabilityZones                      bool
+		expectedGetZones                                  string
+		expectedHasWindows                                bool
+		expectedHasLinux                                  bool
+		expectedCSIControllerReplicas                     string
+		expectedShouldEnableAzureDiskCSISnapshotFeature   bool
+		expectedShouldEnableAzureFileCSISnapshotFeature   bool
+		expectedIsKubernetesVersionGeOneDotSixteenDotZero bool
 	}{
 		{
 			name: "coredns as an example",
@@ -2529,6 +2534,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 							Count:               1,
 							AvailabilityProfile: api.VirtualMachineScaleSets,
 							StorageProfile:      api.ManagedDisks,
+							OSType:              api.Linux,
 						},
 					},
 				},
@@ -2540,11 +2546,17 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedMemLimits:         "300Mi",
 			expectedFoo:               "bar",
 			expectedIsAzureStackCloud: false,
-			expectedNeedsStorageAccountStorageClasses: false,
-			expectedNeedsManagedDiskStorageClasses:    true,
-			expectedUsesCloudControllerManager:        false,
-			expectedHasAvailabilityZones:              false,
-			expectedGetZones:                          "",
+			expectedNeedsStorageAccountStorageClasses:         false,
+			expectedNeedsManagedDiskStorageClasses:            true,
+			expectedUsesCloudControllerManager:                false,
+			expectedHasAvailabilityZones:                      false,
+			expectedGetZones:                                  "",
+			expectedHasWindows:                                false,
+			expectedHasLinux:                                  true,
+			expectedCSIControllerReplicas:                     "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   false,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   true,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: false,
 		},
 		{
 			name: "coredns as an example - Azure Stack",
@@ -2600,6 +2612,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 							Count:               1,
 							AvailabilityProfile: api.VirtualMachineScaleSets,
 							StorageProfile:      api.ManagedDisks,
+							OSType:              api.Linux,
 						},
 					},
 					CustomCloudProfile: &api.CustomCloudProfile{
@@ -2615,11 +2628,17 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedMemLimits:         "300Mi",
 			expectedFoo:               "bar",
 			expectedIsAzureStackCloud: true,
-			expectedNeedsStorageAccountStorageClasses: false,
-			expectedNeedsManagedDiskStorageClasses:    true,
-			expectedUsesCloudControllerManager:        false,
-			expectedHasAvailabilityZones:              false,
-			expectedGetZones:                          "",
+			expectedNeedsStorageAccountStorageClasses:         false,
+			expectedNeedsManagedDiskStorageClasses:            true,
+			expectedUsesCloudControllerManager:                false,
+			expectedHasAvailabilityZones:                      false,
+			expectedGetZones:                                  "",
+			expectedHasWindows:                                false,
+			expectedHasLinux:                                  true,
+			expectedCSIControllerReplicas:                     "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   false,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   true,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: false,
 		},
 		{
 			name: "coredns as an example - StorageAccount",
@@ -2675,6 +2694,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 							Count:               1,
 							AvailabilityProfile: api.VirtualMachineScaleSets,
 							StorageProfile:      api.StorageAccount,
+							OSType:              api.Linux,
 						},
 					},
 				},
@@ -2686,11 +2706,17 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedMemLimits:         "300Mi",
 			expectedFoo:               "bar",
 			expectedIsAzureStackCloud: false,
-			expectedNeedsStorageAccountStorageClasses: true,
-			expectedNeedsManagedDiskStorageClasses:    false,
-			expectedUsesCloudControllerManager:        false,
-			expectedHasAvailabilityZones:              false,
-			expectedGetZones:                          "",
+			expectedNeedsStorageAccountStorageClasses:         true,
+			expectedNeedsManagedDiskStorageClasses:            false,
+			expectedUsesCloudControllerManager:                false,
+			expectedHasAvailabilityZones:                      false,
+			expectedGetZones:                                  "",
+			expectedHasWindows:                                false,
+			expectedHasLinux:                                  true,
+			expectedCSIControllerReplicas:                     "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   false,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   true,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: false,
 		},
 		{
 			name: "coredns as an example - CCM",
@@ -2747,6 +2773,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 							Count:               1,
 							AvailabilityProfile: api.VirtualMachineScaleSets,
 							StorageProfile:      api.ManagedDisks,
+							OSType:              api.Linux,
 						},
 					},
 				},
@@ -2758,11 +2785,17 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedMemLimits:         "300Mi",
 			expectedFoo:               "bar",
 			expectedIsAzureStackCloud: false,
-			expectedNeedsStorageAccountStorageClasses: false,
-			expectedNeedsManagedDiskStorageClasses:    true,
-			expectedUsesCloudControllerManager:        true,
-			expectedHasAvailabilityZones:              false,
-			expectedGetZones:                          "",
+			expectedNeedsStorageAccountStorageClasses:         false,
+			expectedNeedsManagedDiskStorageClasses:            true,
+			expectedUsesCloudControllerManager:                true,
+			expectedHasAvailabilityZones:                      false,
+			expectedGetZones:                                  "",
+			expectedHasWindows:                                false,
+			expectedHasLinux:                                  true,
+			expectedCSIControllerReplicas:                     "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   false,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   true,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: false,
 		},
 		{
 			name: "coredns as an example - Availability Zones",
@@ -2789,7 +2822,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 				Properties: &api.Properties{
 					OrchestratorProfile: &api.OrchestratorProfile{
 						OrchestratorType:    api.Kubernetes,
-						OrchestratorVersion: "1.15.4",
+						OrchestratorVersion: "1.17.0",
 						KubernetesConfig: &api.KubernetesConfig{
 							UseCloudControllerManager: to.BoolPtr(true),
 							NetworkPlugin:             api.NetworkPluginAzure,
@@ -2824,6 +2857,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 								"1",
 								"2",
 							},
+							OSType: api.Linux,
 						},
 					},
 				},
@@ -2835,14 +2869,20 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedMemLimits:         "300Mi",
 			expectedFoo:               "bar",
 			expectedIsAzureStackCloud: false,
-			expectedNeedsStorageAccountStorageClasses: false,
-			expectedNeedsManagedDiskStorageClasses:    true,
-			expectedUsesCloudControllerManager:        true,
-			expectedHasAvailabilityZones:              true,
-			expectedGetZones:                          "\n    - eastus2-1\n    - eastus2-2",
+			expectedNeedsStorageAccountStorageClasses:         false,
+			expectedNeedsManagedDiskStorageClasses:            true,
+			expectedUsesCloudControllerManager:                true,
+			expectedHasAvailabilityZones:                      true,
+			expectedGetZones:                                  "\n    - eastus2-1\n    - eastus2-2",
+			expectedHasWindows:                                false,
+			expectedHasLinux:                                  true,
+			expectedCSIControllerReplicas:                     "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   true,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   false,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: true,
 		},
 		{
-			name: "coredns as an example - Has Windows",
+			name: "coredns as an example - hybrid cluster",
 			addon: api.KubernetesAddon{
 				Name:    common.CoreDNSAddonName,
 				Enabled: to.BoolPtr(true),
@@ -2866,7 +2906,7 @@ func TestGetAddonFuncMap(t *testing.T) {
 				Properties: &api.Properties{
 					OrchestratorProfile: &api.OrchestratorProfile{
 						OrchestratorType:    api.Kubernetes,
-						OrchestratorVersion: "1.15.4",
+						OrchestratorVersion: "1.18.0",
 						KubernetesConfig: &api.KubernetesConfig{
 							UseCloudControllerManager: to.BoolPtr(true),
 							NetworkPlugin:             api.NetworkPluginAzure,
@@ -2899,6 +2939,13 @@ func TestGetAddonFuncMap(t *testing.T) {
 							StorageProfile:      api.ManagedDisks,
 							OSType:              api.Windows,
 						},
+						{
+							Name:                "pool2",
+							Count:               1,
+							AvailabilityProfile: api.VirtualMachineScaleSets,
+							StorageProfile:      api.ManagedDisks,
+							OSType:              api.Linux,
+						},
 					},
 				},
 			},
@@ -2911,6 +2958,11 @@ func TestGetAddonFuncMap(t *testing.T) {
 			expectedNeedsManagedDiskStorageClasses: true,
 			expectedUsesCloudControllerManager:     true,
 			expectedHasWindows:                     true,
+			expectedHasLinux:                       true,
+			expectedCSIControllerReplicas:          "2",
+			expectedShouldEnableAzureDiskCSISnapshotFeature:   true,
+			expectedShouldEnableAzureFileCSISnapshotFeature:   false,
+			expectedIsKubernetesVersionGeOneDotSixteenDotZero: true,
 		},
 	}
 
@@ -2984,6 +3036,31 @@ func TestGetAddonFuncMap(t *testing.T) {
 			if ret[0].Interface() != c.expectedHasWindows {
 				t.Errorf("expected funcMap invocation of HasWindows to return %t, instead got %t", c.expectedHasWindows, ret[0].Interface())
 			}
+			v = reflect.ValueOf(funcMap["HasLinux"])
+			ret = v.Call(make([]reflect.Value, 0))
+			if ret[0].Interface() != c.expectedHasLinux {
+				t.Errorf("expected funcMap invocation of HasLinux to return %t, instead got %t", c.expectedHasLinux, ret[0].Interface())
+			}
+			v = reflect.ValueOf(funcMap["CSIControllerReplicas"])
+			ret = v.Call(make([]reflect.Value, 0))
+			if ret[0].Interface() != c.expectedCSIControllerReplicas {
+				t.Errorf("expected funcMap invocation of CSIControllerReplicas to return %s, instead got %s", c.expectedCSIControllerReplicas, ret[0].Interface())
+			}
+			v = reflect.ValueOf(funcMap["ShouldEnableCSISnapshotFeature"])
+			ret = v.Call([]reflect.Value{reflect.ValueOf(common.AzureDiskCSIDriverAddonName)})
+			if ret[0].Interface() != c.expectedShouldEnableAzureDiskCSISnapshotFeature {
+				t.Errorf("expected funcMap invocation of ShouldEnableCSISnapshotFeature for %s to return %t, instead got %t", common.AzureDiskCSIDriverAddonName, c.expectedShouldEnableAzureDiskCSISnapshotFeature, ret[0].Interface())
+			}
+			v = reflect.ValueOf(funcMap["ShouldEnableCSISnapshotFeature"])
+			ret = v.Call([]reflect.Value{reflect.ValueOf(common.AzureFileCSIDriverAddonName)})
+			if ret[0].Interface() != c.expectedShouldEnableAzureFileCSISnapshotFeature {
+				t.Errorf("expected funcMap invocation of ShouldEnableCSISnapshotFeature for %s to return %t, instead got %t", common.AzureFileCSIDriverAddonName, c.expectedShouldEnableAzureFileCSISnapshotFeature, ret[0].Interface())
+			}
+			v = reflect.ValueOf(funcMap["IsKubernetesVersionGe"])
+			ret = v.Call([]reflect.Value{reflect.ValueOf("1.16.0")})
+			if ret[0].Interface() != c.expectedIsKubernetesVersionGeOneDotSixteenDotZero {
+				t.Errorf("expected funcMap invocation of IsKubernetesVersionGe for 1.16.0 to return %t, instead got %t", c.expectedIsKubernetesVersionGeOneDotSixteenDotZero, ret[0].Interface())
+			}
 		})
 	}
 }
@@ -3029,7 +3106,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
+						"command": "\"/hyperkube\", \"kube-apiserver\"",
 					},
 				},
 				{
@@ -3042,7 +3119,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
+						"command": "\"/hyperkube\", \"kube-controller-manager\"",
 					},
 				},
 				{
@@ -3055,7 +3132,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"cloud-controller-manager\""),
+						"command": "\"cloud-controller-manager\"",
 					},
 				},
 				{
@@ -3068,7 +3145,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
+						"command": "\"/hyperkube\", \"kube-scheduler\"",
 					},
 				},
 				{
@@ -3115,17 +3192,17 @@ func TestGetComponentFuncMap(t *testing.T) {
 			expectedIsAzureStackCloud: false,
 			expectedIsKubernetesVersionGeOneDotFifteenDotZero: true,
 			expectedAPIServerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedAPIServerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
-			expectedAPIServerArgs:                             fmt.Sprintf("\"baz=bang\", \"foo=bar\""),
+			expectedAPIServerCommand:                          "\"/hyperkube\", \"kube-apiserver\"",
+			expectedAPIServerArgs:                             "\"baz=bang\", \"foo=bar\"",
 			expectedControllerManagerImage:                    specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedControllerManagerCommand:                  fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
-			expectedControllerManagerArgs:                     fmt.Sprintf("\"quid=ergo\", \"this=that\""),
+			expectedControllerManagerCommand:                  "\"/hyperkube\", \"kube-controller-manager\"",
+			expectedControllerManagerArgs:                     "\"quid=ergo\", \"this=that\"",
 			expectedCloudControllerManagerImage:               specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.CloudControllerManagerComponentName],
-			expectedCloudControllerManagerCommand:             fmt.Sprintf("\"cloud-controller-manager\""),
-			expectedCloudControllerManagerArgs:                fmt.Sprintf("\"bugs=bunny\""),
+			expectedCloudControllerManagerCommand:             "\"cloud-controller-manager\"",
+			expectedCloudControllerManagerArgs:                "\"bugs=bunny\"",
 			expectedSchedulerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedSchedulerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
-			expectedSchedulerArgs:                             fmt.Sprintf("\"daffy=duck\", \"elmer=fudd\", \"porky=pig\""),
+			expectedSchedulerCommand:                          "\"/hyperkube\", \"kube-scheduler\"",
+			expectedSchedulerArgs:                             "\"daffy=duck\", \"elmer=fudd\", \"porky=pig\"",
 			expectedAddonManagerImage:                         specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.AddonManagerComponentName],
 		},
 		{
@@ -3141,7 +3218,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
+						"command": "\"/hyperkube\", \"kube-apiserver\"",
 					},
 				},
 				{
@@ -3154,7 +3231,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
+						"command": "\"/hyperkube\", \"kube-controller-manager\"",
 					},
 				},
 				{
@@ -3167,7 +3244,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"cloud-controller-manager\""),
+						"command": "\"cloud-controller-manager\"",
 					},
 				},
 				{
@@ -3180,7 +3257,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
+						"command": "\"/hyperkube\", \"kube-scheduler\"",
 					},
 				},
 				{
@@ -3232,17 +3309,17 @@ func TestGetComponentFuncMap(t *testing.T) {
 			expectedIsAzureStackCloud: true,
 			expectedIsKubernetesVersionGeOneDotFifteenDotZero: true,
 			expectedAPIServerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube] + common.AzureStackSuffix,
-			expectedAPIServerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
-			expectedAPIServerArgs:                             fmt.Sprintf("\"baz=bang\", \"foo=bar\""),
+			expectedAPIServerCommand:                          "\"/hyperkube\", \"kube-apiserver\"",
+			expectedAPIServerArgs:                             "\"baz=bang\", \"foo=bar\"",
 			expectedControllerManagerImage:                    specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube] + common.AzureStackSuffix,
-			expectedControllerManagerCommand:                  fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
-			expectedControllerManagerArgs:                     fmt.Sprintf("\"quid=ergo\", \"this=that\""),
+			expectedControllerManagerCommand:                  "\"/hyperkube\", \"kube-controller-manager\"",
+			expectedControllerManagerArgs:                     "\"quid=ergo\", \"this=that\"",
 			expectedCloudControllerManagerImage:               specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.CloudControllerManagerComponentName],
-			expectedCloudControllerManagerCommand:             fmt.Sprintf("\"cloud-controller-manager\""),
-			expectedCloudControllerManagerArgs:                fmt.Sprintf("\"bugs=bunny\""),
+			expectedCloudControllerManagerCommand:             "\"cloud-controller-manager\"",
+			expectedCloudControllerManagerArgs:                "\"bugs=bunny\"",
 			expectedSchedulerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube] + common.AzureStackSuffix,
-			expectedSchedulerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
-			expectedSchedulerArgs:                             fmt.Sprintf("\"daffy=duck\", \"elmer=fudd\", \"porky=pig\""),
+			expectedSchedulerCommand:                          "\"/hyperkube\", \"kube-scheduler\"",
+			expectedSchedulerArgs:                             "\"daffy=duck\", \"elmer=fudd\", \"porky=pig\"",
 			expectedAddonManagerImage:                         specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.AddonManagerComponentName],
 		},
 		{
@@ -3258,7 +3335,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
+						"command": "\"/hyperkube\", \"kube-apiserver\"",
 					},
 				},
 				{
@@ -3271,7 +3348,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
+						"command": "\"/hyperkube\", \"kube-controller-manager\"",
 					},
 				},
 				{
@@ -3284,7 +3361,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"cloud-controller-manager\""),
+						"command": "\"cloud-controller-manager\"",
 					},
 				},
 				{
@@ -3297,7 +3374,7 @@ func TestGetComponentFuncMap(t *testing.T) {
 						},
 					},
 					Config: map[string]string{
-						"command": fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
+						"command": "\"/hyperkube\", \"kube-scheduler\"",
 					},
 				},
 				{
@@ -3344,17 +3421,17 @@ func TestGetComponentFuncMap(t *testing.T) {
 			expectedIsAzureStackCloud: false,
 			expectedIsKubernetesVersionGeOneDotFifteenDotZero: false,
 			expectedAPIServerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedAPIServerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-apiserver\""),
-			expectedAPIServerArgs:                             fmt.Sprintf("\"baz=bang\", \"foo=bar\""),
+			expectedAPIServerCommand:                          "\"/hyperkube\", \"kube-apiserver\"",
+			expectedAPIServerArgs:                             "\"baz=bang\", \"foo=bar\"",
 			expectedControllerManagerImage:                    specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedControllerManagerCommand:                  fmt.Sprintf("\"/hyperkube\", \"kube-controller-manager\""),
-			expectedControllerManagerArgs:                     fmt.Sprintf("\"quid=ergo\", \"this=that\""),
+			expectedControllerManagerCommand:                  "\"/hyperkube\", \"kube-controller-manager\"",
+			expectedControllerManagerArgs:                     "\"quid=ergo\", \"this=that\"",
 			expectedCloudControllerManagerImage:               specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.CloudControllerManagerComponentName],
-			expectedCloudControllerManagerCommand:             fmt.Sprintf("\"cloud-controller-manager\""),
-			expectedCloudControllerManagerArgs:                fmt.Sprintf("\"bugs=bunny\""),
+			expectedCloudControllerManagerCommand:             "\"cloud-controller-manager\"",
+			expectedCloudControllerManagerArgs:                "\"bugs=bunny\"",
 			expectedSchedulerImage:                            specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.Hyperkube],
-			expectedSchedulerCommand:                          fmt.Sprintf("\"/hyperkube\", \"kube-scheduler\""),
-			expectedSchedulerArgs:                             fmt.Sprintf("\"daffy=duck\", \"elmer=fudd\", \"porky=pig\""),
+			expectedSchedulerCommand:                          "\"/hyperkube\", \"kube-scheduler\"",
+			expectedSchedulerArgs:                             "\"daffy=duck\", \"elmer=fudd\", \"porky=pig\"",
 			expectedAddonManagerImage:                         specConfig.KubernetesImageBase + k8sComponentsByVersionMap["1.15.7"][common.AddonManagerComponentName],
 		},
 	}

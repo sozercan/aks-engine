@@ -155,7 +155,7 @@ const (
 	// DefaultKeyVaultFlexVolumeAddonEnabled determines the aks-engine provided default for enabling key vault flexvolume addon
 	DefaultKeyVaultFlexVolumeAddonEnabled = true
 	// DefaultDashboardAddonEnabled determines the aks-engine provided default for enabling kubernetes-dashboard addon
-	DefaultDashboardAddonEnabled = true
+	DefaultDashboardAddonEnabled = false
 	// DefaultReschedulerAddonEnabled determines the aks-engine provided default for enabling kubernetes-rescheduler addon
 	DefaultReschedulerAddonEnabled = false
 	// DefaultAzureCNIMonitoringAddonEnabled determines the aks-engine provided default for enabling azurecni-network monitoring addon
@@ -334,11 +334,11 @@ const (
 	// AzureCniPluginVerLinux specifies version of Azure CNI plugin, which has been mirrored from
 	// https://github.com/Azure/azure-container-networking/releases/download/${AZURE_PLUGIN_VER}/azure-vnet-cni-linux-amd64-${AZURE_PLUGIN_VER}.tgz
 	// to https://kubernetesartifacts.azureedge.net/azure-cni
-	AzureCniPluginVerLinux = "v1.0.33"
+	AzureCniPluginVerLinux = "v1.1.0"
 	// AzureCniPluginVerWindows specifies version of Azure CNI plugin, which has been mirrored from
 	// https://github.com/Azure/azure-container-networking/releases/download/${AZURE_PLUGIN_VER}/azure-vnet-cni-windows-amd64-${AZURE_PLUGIN_VER}.zip
 	// to https://kubernetesartifacts.azureedge.net/azure-cni
-	AzureCniPluginVerWindows = "v1.0.33"
+	AzureCniPluginVerWindows = "v1.1.0"
 	// CNIPluginVer specifies the version of CNI implementation
 	// https://github.com/containernetworking/plugins
 	CNIPluginVer = "v0.8.5"
@@ -483,6 +483,8 @@ const (
 	DefaultNonMasqueradeCIDR = "0.0.0.0/0"
 	// DefaultKubeProxyMode is the default KubeProxyMode value
 	DefaultKubeProxyMode KubeProxyMode = KubeProxyModeIPTables
+	// DefaultWindowsSSHEnabled is the default windowsProfile.sshEnabled value
+	DefaultWindowsSSHEnabled = true
 )
 
 const (
