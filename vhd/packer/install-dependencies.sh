@@ -72,7 +72,7 @@ MOBY_VERSION="3.0.11"
 installMoby
 echo "  - moby v${MOBY_VERSION}" >> ${VHD_LOGS_FILEPATH}
 downloadGPUDrivers
-echo "  - nvidia-docker2 nvidia-container-runtime" >> ${VHD_LOGS_FILEPATH}
+echo "  - nvidia-container-toolkit" >> ${VHD_LOGS_FILEPATH}
 
 ETCD_VERSION="3.3.19"
 ETCD_DOWNLOAD_URL="mcr.microsoft.com/oss/etcd-io/"

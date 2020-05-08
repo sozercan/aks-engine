@@ -33,17 +33,17 @@ systemctlEtcd() {
     return 1
   fi
 }
-configureAdminUser(){
+configureAdminUser() {
   chage -E -1 -I -1 -m 0 -M 99999 "${ADMINUSER}"
   chage -l "${ADMINUSER}"
 }
-configureEtcdUser(){
+configureEtcdUser() {
   useradd -U etcd
   chage -E -1 -I -1 -m 0 -M 99999 etcd
   chage -l etcd
   id etcd
 }
-configureSecrets(){
+configureSecrets() {
   APISERVER_PRIVATE_KEY_PATH="/etc/kubernetes/certs/apiserver.key"
   touch "${APISERVER_PRIVATE_KEY_PATH}"
   CA_PRIVATE_KEY_PATH="/etc/kubernetes/certs/ca.key"
@@ -213,9 +213,9 @@ EOF
 }
 
 installNetworkPlugin() {
-{{- if IsAzureCNI}}
+  {{- if IsAzureCNI}}
   installAzureCNI
-{{end}}
+  {{end}}
   installCNI
   rm -rf $CNI_DOWNLOADS_DIR &
 }
@@ -252,24 +252,24 @@ configureCNI() {
   systemctl restart sys-fs-bpf.mount
   REBOOTREQUIRED=true
   {{end}}
-{{- if IsAzureStackCloud}}
+  {{- if IsAzureStackCloud}}
   if [[ ${NETWORK_PLUGIN} == "azure" ]]; then
     {{/* set environment to mas when using Azure CNI on Azure Stack */}}
     {{/* shellcheck disable=SC2002,SC2005 */}}
     echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipam.environment = "mas"') >"$CNI_CONFIG_DIR/10-azure.conflist"
   fi
-{{end}}
+  {{end}}
 }
 configureAzureCNI() {
   if [[ "${NETWORK_PLUGIN}" == "azure" ]]; then
     mv $CNI_BIN_DIR/10-azure.conflist $CNI_CONFIG_DIR/
     chmod 600 $CNI_CONFIG_DIR/10-azure.conflist
     if [[ "${IS_IPV6_DUALSTACK_FEATURE_ENABLED}" == "true" ]]; then
-      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipv6Mode="ipv6nat"') > "$CNI_CONFIG_DIR/10-azure.conflist"
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipv6Mode="ipv6nat"') >"$CNI_CONFIG_DIR/10-azure.conflist"
     fi
     if [[ {{GetKubeProxyMode}} == "ipvs" ]]; then
       serviceCidrs={{GetServiceCidr}}
-      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq  --arg serviceCidrs $serviceCidrs '.plugins[0]+={serviceCidrs: $serviceCidrs}') > /etc/cni/net.d/10-azure.conflist
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq --arg serviceCidrs $serviceCidrs '.plugins[0]+={serviceCidrs: $serviceCidrs}') >/etc/cni/net.d/10-azure.conflist
     fi
     if [[ "${NETWORK_POLICY}" == "calico" ]]; then
       sed -i 's#"mode":"bridge"#"mode":"transparent"#g' $CNI_CONFIG_DIR/10-azure.conflist
@@ -424,7 +424,7 @@ ensureK8sControlPlane() {
   if $REBOOTREQUIRED || [ "$NO_OUTBOUND" = "true" ]; then
     return
   fi
-  retrycmd 120 5 25 $KUBECTL 2>/dev/null cluster-info || exit {{GetCSEErrorCode "ERR_K8S_RUNNING_TIMEOUT"}}
+  retrycmd 120 5 25 $KUBECTL cluster-info 2>/dev/null || exit {{GetCSEErrorCode "ERR_K8S_RUNNING_TIMEOUT"}}
 }
 {{- if IsAzurePolicyAddonEnabled}}
 ensureLabelExclusionForAzurePolicyAddon() {
@@ -536,23 +536,12 @@ installNvidiaDrivers() {
   sh $GPU_DEST/nvidia-drivers-$GPU_DV -s -k=$KERNEL_NAME --log-file-name=$log_file -a --no-drm --dkms --utility-prefix="${GPU_DEST}" --opengl-prefix="${GPU_DEST}"
 }
 configGPUDrivers() {
-  {{/* only install the runtime since nvidia-docker2 has a hard dep on docker CE packages. */}}
-  {{/* we will manually install nvidia-docker2 */}}
   rmmod nouveau
   echo blacklist nouveau >>/etc/modprobe.d/blacklist.conf
   retrycmd_no_stats 120 5 25 update-initramfs -u || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   wait_for_apt_locks
   {{/* if the unattened upgrade is turned on, and it may takes 10 min to finish the installation, and we use the 1 second just to try to get the lock more aggressively */}}
-  retrycmd 600 1 3600 apt-get -o Dpkg::Options::="--force-confold" install -y nvidia-container-runtime="${NVIDIA_CONTAINER_RUNTIME_VERSION}+${NVIDIA_DOCKER_SUFFIX}" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-  tmpDir=$GPU_DEST/tmp
-  (
-    set -e -o pipefail
-    cd "${tmpDir}"
-    wait_for_apt_locks
-    dpkg-deb -R ./nvidia-docker2*.deb "${tmpDir}/pkg" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-    cp -r ${tmpDir}/pkg/usr/* /usr/ || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-  )
-  rm -rf $GPU_DEST/tmp
+  retrycmd 600 1 3600 apt-get -o Dpkg::Options::="--force-confold" install -y nvidia-container-toolkit="${NVIDIA_CONTAINER_TOOLKIT_VERSION}" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   retrycmd 120 5 25 pkill -SIGHUP dockerd || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   mkdir -p $GPU_DEST/lib64 $GPU_DEST/overlay-workdir
   retrycmd 120 5 25 mount -t overlay -o lowerdir=/usr/lib/x86_64-linux-gnu,upperdir=${GPU_DEST}/lib64,workdir=${GPU_DEST}/overlay-workdir none /usr/lib/x86_64-linux-gnu || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}

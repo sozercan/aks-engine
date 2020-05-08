@@ -34643,17 +34643,17 @@ systemctlEtcd() {
     return 1
   fi
 }
-configureAdminUser(){
+configureAdminUser() {
   chage -E -1 -I -1 -m 0 -M 99999 "${ADMINUSER}"
   chage -l "${ADMINUSER}"
 }
-configureEtcdUser(){
+configureEtcdUser() {
   useradd -U etcd
   chage -E -1 -I -1 -m 0 -M 99999 etcd
   chage -l etcd
   id etcd
 }
-configureSecrets(){
+configureSecrets() {
   APISERVER_PRIVATE_KEY_PATH="/etc/kubernetes/certs/apiserver.key"
   touch "${APISERVER_PRIVATE_KEY_PATH}"
   CA_PRIVATE_KEY_PATH="/etc/kubernetes/certs/ca.key"
@@ -34823,9 +34823,9 @@ EOF
 }
 
 installNetworkPlugin() {
-{{- if IsAzureCNI}}
+  {{- if IsAzureCNI}}
   installAzureCNI
-{{end}}
+  {{end}}
   installCNI
   rm -rf $CNI_DOWNLOADS_DIR &
 }
@@ -34862,24 +34862,24 @@ configureCNI() {
   systemctl restart sys-fs-bpf.mount
   REBOOTREQUIRED=true
   {{end}}
-{{- if IsAzureStackCloud}}
+  {{- if IsAzureStackCloud}}
   if [[ ${NETWORK_PLUGIN} == "azure" ]]; then
     {{/* set environment to mas when using Azure CNI on Azure Stack */}}
     {{/* shellcheck disable=SC2002,SC2005 */}}
     echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipam.environment = "mas"') >"$CNI_CONFIG_DIR/10-azure.conflist"
   fi
-{{end}}
+  {{end}}
 }
 configureAzureCNI() {
   if [[ "${NETWORK_PLUGIN}" == "azure" ]]; then
     mv $CNI_BIN_DIR/10-azure.conflist $CNI_CONFIG_DIR/
     chmod 600 $CNI_CONFIG_DIR/10-azure.conflist
     if [[ "${IS_IPV6_DUALSTACK_FEATURE_ENABLED}" == "true" ]]; then
-      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipv6Mode="ipv6nat"') > "$CNI_CONFIG_DIR/10-azure.conflist"
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq '.plugins[0].ipv6Mode="ipv6nat"') >"$CNI_CONFIG_DIR/10-azure.conflist"
     fi
     if [[ {{GetKubeProxyMode}} == "ipvs" ]]; then
       serviceCidrs={{GetServiceCidr}}
-      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq  --arg serviceCidrs $serviceCidrs '.plugins[0]+={serviceCidrs: $serviceCidrs}') > /etc/cni/net.d/10-azure.conflist
+      echo $(cat "$CNI_CONFIG_DIR/10-azure.conflist" | jq --arg serviceCidrs $serviceCidrs '.plugins[0]+={serviceCidrs: $serviceCidrs}') >/etc/cni/net.d/10-azure.conflist
     fi
     if [[ "${NETWORK_POLICY}" == "calico" ]]; then
       sed -i 's#"mode":"bridge"#"mode":"transparent"#g' $CNI_CONFIG_DIR/10-azure.conflist
@@ -35034,7 +35034,7 @@ ensureK8sControlPlane() {
   if $REBOOTREQUIRED || [ "$NO_OUTBOUND" = "true" ]; then
     return
   fi
-  retrycmd 120 5 25 $KUBECTL 2>/dev/null cluster-info || exit {{GetCSEErrorCode "ERR_K8S_RUNNING_TIMEOUT"}}
+  retrycmd 120 5 25 $KUBECTL cluster-info 2>/dev/null || exit {{GetCSEErrorCode "ERR_K8S_RUNNING_TIMEOUT"}}
 }
 {{- if IsAzurePolicyAddonEnabled}}
 ensureLabelExclusionForAzurePolicyAddon() {
@@ -35146,23 +35146,12 @@ installNvidiaDrivers() {
   sh $GPU_DEST/nvidia-drivers-$GPU_DV -s -k=$KERNEL_NAME --log-file-name=$log_file -a --no-drm --dkms --utility-prefix="${GPU_DEST}" --opengl-prefix="${GPU_DEST}"
 }
 configGPUDrivers() {
-  {{/* only install the runtime since nvidia-docker2 has a hard dep on docker CE packages. */}}
-  {{/* we will manually install nvidia-docker2 */}}
   rmmod nouveau
   echo blacklist nouveau >>/etc/modprobe.d/blacklist.conf
   retrycmd_no_stats 120 5 25 update-initramfs -u || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   wait_for_apt_locks
   {{/* if the unattened upgrade is turned on, and it may takes 10 min to finish the installation, and we use the 1 second just to try to get the lock more aggressively */}}
-  retrycmd 600 1 3600 apt-get -o Dpkg::Options::="--force-confold" install -y nvidia-container-runtime="${NVIDIA_CONTAINER_RUNTIME_VERSION}+${NVIDIA_DOCKER_SUFFIX}" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-  tmpDir=$GPU_DEST/tmp
-  (
-    set -e -o pipefail
-    cd "${tmpDir}"
-    wait_for_apt_locks
-    dpkg-deb -R ./nvidia-docker2*.deb "${tmpDir}/pkg" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-    cp -r ${tmpDir}/pkg/usr/* /usr/ || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
-  )
-  rm -rf $GPU_DEST/tmp
+  retrycmd 600 1 3600 apt-get -o Dpkg::Options::="--force-confold" install -y nvidia-container-toolkit="${NVIDIA_CONTAINER_TOOLKIT_VERSION}" || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   retrycmd 120 5 25 pkill -SIGHUP dockerd || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
   mkdir -p $GPU_DEST/lib64 $GPU_DEST/overlay-workdir
   retrycmd 120 5 25 mount -t overlay -o lowerdir=/usr/lib/x86_64-linux-gnu,upperdir=${GPU_DEST}/lib64,workdir=${GPU_DEST}/overlay-workdir none /usr/lib/x86_64-linux-gnu || exit {{GetCSEErrorCode "ERR_GPU_DRIVERS_CONFIG"}}
@@ -35520,12 +35509,9 @@ if ! echo "${UBUNTU_OS_NAME} ${RHEL_OS_NAME} ${DEBIAN_OS_NAME}" | grep -q "${OS}
   OS=$(sort -r /etc/*-release | gawk 'match($0, /^(ID_LIKE=(.*))$/, a) { print toupper(a[2] a[3]); exit }')
 fi
 DOCKER=/usr/bin/docker
-export GPU_DV=418.40.04
+export GPU_DV=440.82
 export GPU_DEST=/usr/local/nvidia
-NVIDIA_DOCKER_VERSION=2.0.3
-DOCKER_VERSION=1.13.1-1
-NVIDIA_CONTAINER_RUNTIME_VERSION=2.0.0
-NVIDIA_DOCKER_SUFFIX=docker18.09.2-1
+NVIDIA_CONTAINER_TOOLKIT_VERSION=1.0.5-1
 
 configure_prerequisites() {
   ip_forward_path=/proc/sys/net/ipv4/ip_forward
@@ -35550,7 +35536,10 @@ aptmarkWALinuxAgent() {
 }
 
 retrycmd() {
-  retries=$1; wait_sleep=$2; timeout=$3; shift && shift && shift
+  retries=$1
+  wait_sleep=$2
+  timeout=$3
+  shift && shift && shift
   for i in $(seq 1 $retries); do
     timeout $timeout ${@} && break ||
       if [ $i -eq $retries ]; then
@@ -35563,7 +35552,10 @@ retrycmd() {
   echo Executed \"$@\" $i times
 }
 retrycmd_no_stats() {
-  retries=$1; wait_sleep=$2; timeout=$3; shift && shift && shift
+  retries=$1
+  wait_sleep=$2
+  timeout=$3
+  shift && shift && shift
   for i in $(seq 1 $retries); do
     timeout $timeout ${@} && break ||
       if [ $i -eq $retries ]; then
@@ -35574,7 +35566,10 @@ retrycmd_no_stats() {
   done
 }
 retrycmd_get_tarball() {
-  tar_retries=$1; wait_sleep=$2; tarball=$3; url=$4
+  tar_retries=$1
+  wait_sleep=$2
+  tarball=$3
+  url=$4
   echo "${tar_retries} retries"
   for i in $(seq 1 $tar_retries); do
     tar -tzf $tarball && break ||
@@ -35587,7 +35582,11 @@ retrycmd_get_tarball() {
   done
 }
 retrycmd_get_executable() {
-  retries=$1; wait_sleep=$2; filepath=$3; url=$4; validation_args=$5
+  retries=$1
+  wait_sleep=$2
+  filepath=$3
+  url=$4
+  validation_args=$5
   echo "${retries} retries"
   for i in $(seq 1 $retries); do
     $filepath $validation_args && break ||
@@ -35601,7 +35600,9 @@ retrycmd_get_executable() {
   done
 }
 wait_for_file() {
-  retries=$1; wait_sleep=$2; filepath=$3
+  retries=$1
+  wait_sleep=$2
+  filepath=$3
   paved=/opt/azure/cloud-init-files.paved
   grep -Fq "${filepath}" $paved && return 0
   for i in $(seq 1 $retries); do
@@ -35634,13 +35635,17 @@ apt_get_update() {
       cat $apt_update_output
     if [ $i -eq $retries ]; then
       return 1
-    else sleep 5
+    else
+      sleep 5
     fi
   done
   echo Executed apt-get update $i times
 }
 apt_get_install() {
-  retries=$1; wait_sleep=$2; timeout=$3; shift && shift && shift
+  retries=$1
+  wait_sleep=$2
+  timeout=$3
+  shift && shift && shift
   for i in $(seq 1 $retries); do
     wait_for_apt_locks
     export DEBIAN_FRONTEND=noninteractive
@@ -35656,7 +35661,9 @@ apt_get_install() {
   echo Executed apt-get install --no-install-recommends -y \"$@\" $i times
 }
 apt_get_purge() {
-  retries=20; wait_sleep=30; timeout=120
+  retries=20
+  wait_sleep=30
+  timeout=120
   for package in $@; do
     if apt list --installed | grep $package; then
       for i in $(seq 1 $retries); do
@@ -35683,18 +35690,21 @@ apt_get_dist_upgrade() {
     dpkg --configure -a --force-confdef
     apt-get -f -y install
     apt-mark showhold
-    ! (apt-get dist-upgrade -y 2>&1 | tee $apt_dist_upgrade_output | grep -E "^([WE]:.*)|([eE]rr.*)$") && \
-    cat $apt_dist_upgrade_output && break || \
-    cat $apt_dist_upgrade_output
+    ! (apt-get dist-upgrade -y 2>&1 | tee $apt_dist_upgrade_output | grep -E "^([WE]:.*)|([eE]rr.*)$") &&
+      cat $apt_dist_upgrade_output && break ||
+      cat $apt_dist_upgrade_output
     if [ $i -eq $retries ]; then
       return 1
-    else sleep 5
+    else
+      sleep 5
     fi
   done
   echo Executed apt-get dist-upgrade $i times
 }
 systemctl_restart() {
-  retries=$1; wait_sleep=$2; timeout=$3 svcname=$4
+  retries=$1
+  wait_sleep=$2
+  timeout=$3 svcname=$4
   for i in $(seq 1 $retries); do
     timeout $timeout systemctl daemon-reload
     timeout $timeout systemctl restart $svcname && break ||
@@ -35706,7 +35716,9 @@ systemctl_restart() {
   done
 }
 systemctl_stop() {
-  retries=$1; wait_sleep=$2; timeout=$3 svcname=$4
+  retries=$1
+  wait_sleep=$2
+  timeout=$3 svcname=$4
   for i in $(seq 1 $retries); do
     timeout $timeout systemctl daemon-reload
     timeout $timeout systemctl stop $svcname && break ||
@@ -35718,7 +35730,9 @@ systemctl_stop() {
   done
 }
 sysctl_reload() {
-  retries=$1; wait_sleep=$2; timeout=$3
+  retries=$1
+  wait_sleep=$2
+  timeout=$3
   for i in $(seq 1 $retries); do
     timeout $timeout sysctl --system && break ||
       if [ $i -eq $retries ]; then
@@ -35828,15 +35842,7 @@ downloadGPUDrivers() {
   wait_for_apt_locks
   retrycmd_no_stats 120 5 25 cat $GPU_DEST/tmp/nvidia-docker.list >/etc/apt/sources.list.d/nvidia-docker.list || exit 85
   apt_get_update
-  retrycmd 30 5 60 curl -fLS https://us.download.nvidia.com/tesla/$GPU_DV/NVIDIA-Linux-x86_64-${GPU_DV}.run -o ${GPU_DEST}/nvidia-drivers-${GPU_DV} || exit 85
-  tmpDir=$GPU_DEST/tmp
-  if ! (
-    set -e -o pipefail
-    cd "${tmpDir}"
-    retrycmd 30 5 3600 apt-get download nvidia-docker2="${NVIDIA_DOCKER_VERSION}+${NVIDIA_DOCKER_SUFFIX}" || exit 85
-  ); then
-    exit 85
-  fi
+  retrycmd 30 5 60 curl -fLS http://us.download.nvidia.com/XFree86/Linux-x86_64/${GPU_DV}/NVIDIA-Linux-x86_64-${GPU_DV}.run -o ${GPU_DEST}/nvidia-drivers-${GPU_DV} || exit 85
 }
 installMoby() {
   removeContainerd

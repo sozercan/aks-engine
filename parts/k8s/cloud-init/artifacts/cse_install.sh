@@ -76,15 +76,7 @@ downloadGPUDrivers() {
   wait_for_apt_locks
   retrycmd_no_stats 120 5 25 cat $GPU_DEST/tmp/nvidia-docker.list >/etc/apt/sources.list.d/nvidia-docker.list || exit 85
   apt_get_update
-  retrycmd 30 5 60 curl -fLS https://us.download.nvidia.com/tesla/$GPU_DV/NVIDIA-Linux-x86_64-${GPU_DV}.run -o ${GPU_DEST}/nvidia-drivers-${GPU_DV} || exit 85
-  tmpDir=$GPU_DEST/tmp
-  if ! (
-    set -e -o pipefail
-    cd "${tmpDir}"
-    retrycmd 30 5 3600 apt-get download nvidia-docker2="${NVIDIA_DOCKER_VERSION}+${NVIDIA_DOCKER_SUFFIX}" || exit 85
-  ); then
-    exit 85
-  fi
+  retrycmd 30 5 60 curl -fLS http://us.download.nvidia.com/XFree86/Linux-x86_64/${GPU_DV}/NVIDIA-Linux-x86_64-${GPU_DV}.run -o ${GPU_DEST}/nvidia-drivers-${GPU_DV} || exit 85
 }
 installMoby() {
   removeContainerd
